@@ -3,11 +3,11 @@
 import * as React from 'react';
 import { Archive, ArrowLeft, Check, Copy, ExternalLink, FilePlus2, FolderInput, NotebookPen, Star, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import type { SavedLink } from '@/db/types';
+import type { Note, SavedLink } from '@/db/types';
 import { destinationLabel, INBOX_DESTINATION, folderDestination } from '@/lib/destination';
 import { displayUrl, formatShortDate } from '@/lib/format';
 import { useBackDismiss } from '@/hooks/use-back-dismiss';
-import { useVaultStore, selectNotesForLink } from '@/stores/vault-store';
+import { useVaultStore } from '@/stores/vault-store';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
@@ -34,9 +34,18 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
   const router = useRouter();
   const folders = useVaultStore((state) => state.folders);
   const notes = useVaultStore((state) => state.notes);
+  const noteLinks = useVaultStore((state) => state.noteLinks);
+  const linkId = link?.id;
   // Notes that already reference this link, so a saved link can show what
   // thinking it is attached to.
-  const referencingNotes = useVaultStore((state) => (link ? selectNotesForLink(state, link.id) : []));
+  const referencingNotes = React.useMemo(() => {
+    if (!linkId) return [];
+    const notesById = new Map(notes.map((candidate) => [candidate.id, candidate]));
+    return noteLinks
+      .filter((row) => row.linkId === linkId)
+      .map((row) => notesById.get(row.noteId))
+      .filter((candidate): candidate is Note => candidate !== undefined);
+  }, [linkId, noteLinks, notes]);
   // State is initialised from props and reset by remounting: callers pass a
   // `key` derived from the link id, so a different link always starts clean.
   const [mode, setMode] = React.useState<Mode>('actions');
