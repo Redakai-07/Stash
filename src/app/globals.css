@@ -1,0 +1,277 @@
+@import 'tailwindcss';
+
+/*
+ * Stash design tokens.
+ *
+ * The palette is intentionally restrained: near-black surfaces in dark mode,
+ * clean neutrals in light mode, and a single indigo accent used only for the
+ * active control or the one primary action on screen. Colour is a signal here,
+ * not decoration.
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: oklch(0.982 0.001 265);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.964 0.002 265);
+  --surface-3: oklch(0.935 0.003 265);
+  --fg: oklch(0.215 0.01 265);
+  --muted-fg: oklch(0.53 0.012 265);
+  --subtle-fg: oklch(0.655 0.01 265);
+  --border: oklch(0.912 0.004 265);
+  --border-strong: oklch(0.86 0.006 265);
+  --accent: oklch(0.555 0.19 274);
+  --accent-hover: oklch(0.5 0.19 274);
+  --accent-fg: oklch(0.995 0 0);
+  --accent-soft: oklch(0.955 0.022 274);
+  --danger: oklch(0.575 0.2 25);
+  --danger-soft: oklch(0.955 0.03 25);
+  --success: oklch(0.6 0.14 155);
+  --warning: oklch(0.7 0.14 75);
+  --overlay: oklch(0.2 0.01 265 / 0.35);
+  --shadow-sheet: 0 -8px 40px oklch(0.2 0.01 265 / 0.16);
+  --shadow-raised: 0 1px 2px oklch(0.2 0.01 265 / 0.06), 0 8px 24px oklch(0.2 0.01 265 / 0.06);
+  color-scheme: light;
+}
+
+.dark {
+  --bg: oklch(0.148 0.004 265);
+  --surface: oklch(0.198 0.005 265);
+  --surface-2: oklch(0.238 0.006 265);
+  --surface-3: oklch(0.278 0.007 265);
+  --fg: oklch(0.965 0.002 265);
+  --muted-fg: oklch(0.685 0.01 265);
+  --subtle-fg: oklch(0.56 0.01 265);
+  --border: oklch(0.282 0.006 265);
+  --border-strong: oklch(0.35 0.008 265);
+  --accent: oklch(0.685 0.155 274);
+  --accent-hover: oklch(0.73 0.15 274);
+  --accent-fg: oklch(0.17 0.03 274);
+  --accent-soft: oklch(0.268 0.05 274);
+  --danger: oklch(0.685 0.175 25);
+  --danger-soft: oklch(0.27 0.06 25);
+  --success: oklch(0.72 0.14 155);
+  --warning: oklch(0.78 0.13 75);
+  --overlay: oklch(0.08 0 0 / 0.6);
+  --shadow-sheet: 0 -8px 40px oklch(0 0 0 / 0.5);
+  --shadow-raised: 0 1px 2px oklch(0 0 0 / 0.4), 0 8px 24px oklch(0 0 0 / 0.35);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted-fg);
+  --color-subtle: var(--subtle-fg);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-overlay: var(--overlay);
+
+  --radius-card: 1rem;
+  --radius-sheet: 1.5rem;
+
+  --shadow-sheet: var(--shadow-sheet);
+  --shadow-raised: var(--shadow-raised);
+
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji';
+
+  --animate-sheet-in: sheet-in 240ms cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-sheet-out: sheet-out 180ms cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-overlay-in: overlay-in 200ms ease-out;
+  --animate-overlay-out: overlay-out 160ms ease-in;
+  --animate-pop-in: pop-in 200ms cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-rise: rise 260ms cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-check: check 320ms ease-out;
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheet-out {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes check {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/*
+ * Mobile shell. The app is used one-handed on a phone, so the page itself
+ * never scrolls: individual surfaces do. That keeps the bottom navigation and
+ * sheets anchored the way a native app behaves.
+ */
+@layer base {
+  html {
+    height: 100%;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    height: 100%;
+    margin: 0;
+    background-color: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  button,
+  [role='button'] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  input,
+  textarea {
+    -webkit-user-select: text;
+    user-select: text;
+    font: inherit;
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* Keep the scrollbar out of the way on desktop while still allowing scroll. */
+  @media (pointer: fine) {
+    .scroll-area {
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-strong) transparent;
+    }
+  }
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+@utility mb-safe {
+  margin-bottom: env(safe-area-inset-bottom);
+}
+
+/* Tap feedback that does not rely on hover, which phones do not have. */
+@utility tap {
+  transition:
+    transform 140ms cubic-bezier(0.32, 0.72, 0, 1),
+    background-color 140ms ease-out,
+    opacity 140ms ease-out;
+}
+
+@utility tap-scale {
+  &:active {
+    transform: scale(0.975);
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

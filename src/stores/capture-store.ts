@@ -1,0 +1,304 @@
+'use client';
+
+import { create } from 'zustand';
+import type { SavedLink } from '@/db/types';
+import type { DuplicateMatch } from '@/db/repos/links';
+import { domainOf } from '@/lib/url/extract';
+import { isHttpUrl } from '@/lib/url/normalize';
+import {
+  INBOX_DESTINATION,
+  destinationFolderId,
+  destinationIsFavorite,
+  folderDestination,
+  type DestinationSelection,
+} from '@/lib/destination';
+import { parseShareToDraft } from '@/lib/share/parse';
+import { labelForDomain, type IncomingShare } from '@/lib/share/types';
+import { useVaultStore } from './vault-store';
+
+/**
+ * The capture flow.
+ *
+ * This is the app's most important interaction, so it is modelled as an
+ * explicit state machine rather than a pile of local component state:
+ *
+ *   idle -> open -> (duplicate resolution) -> saving -> done
+ *
+ * Two entry points arrive here: a share from another Android app (already
+ * normalized by the native bridge) and a manual add. Both converge on the same
+ * draft, so the sheet never needs to know where the link came from.
+ */
+
+export type CaptureMode = 'share' | 'manual';
+export type CaptureStatus = 'idle' | 'open' | 'saving';
+
+export interface CaptureDraft {
+  url: string;
+  title: string;
+  note: string;
+  /** Verbatim shared text, kept for provenance and shown as context. */
+  rawText: string;
+  domain: string;
+  sourceLabel?: string;
+  sourcePackage?: string;
+  appLabel?: string;
+  /** Other links found in the same shared text. */
+  otherUrls: string[];
+  receivedAt: number;
+}
+
+export type SaveFailureReason = 'invalid-url' | 'duplicate' | 'unavailable';
+
+export interface SaveOutcome {
+  ok: boolean;
+  reason?: SaveFailureReason;
+  link?: SavedLink;
+  savedCount?: number;
+}
+
+interface CaptureState {
+  status: CaptureStatus;
+  mode: CaptureMode;
+  draft: CaptureDraft | null;
+  /** Populated when a share arrived that contained no usable link. */
+  unreadable: IncomingShare | null;
+
+  destination: DestinationSelection;
+  /** True once the user chose to save despite an existing copy. */
+  duplicateAcknowledged: boolean;
+  duplicates: DuplicateMatch[];
+  duplicateCheckDone: boolean;
+
+  saveOtherUrls: boolean;
+  showCreateFolder: boolean;
+
+  openFromShare: (share: IncomingShare) => Promise<void>;
+  openManual: () => void;
+  setDraftField: (field: 'url' | 'title' | 'note', value: string) => void;
+  setSaveOtherUrls: (value: boolean) => void;
+  selectDestination: (selection: DestinationSelection) => void;
+  setShowCreateFolder: (value: boolean) => void;
+  recheckDuplicates: () => Promise<void>;
+  acknowledgeDuplicate: () => void;
+  save: () => Promise<SaveOutcome>;
+  moveExisting: (linkId: string) => Promise<SaveOutcome>;
+  reset: () => void;
+}
+
+function emptyDraft(): CaptureDraft {
+  return {
+    url: '',
+    title: '',
+    note: '',
+    rawText: '',
+    domain: '',
+    otherUrls: [],
+    receivedAt: Date.now(),
+  };
+}
+
+export const useCaptureStore = create<CaptureState>((set, get) => ({
+  status: 'idle',
+  mode: 'share',
+  draft: null,
+  unreadable: null,
+  destination: INBOX_DESTINATION,
+  duplicateAcknowledged: false,
+  duplicates: [],
+  duplicateCheckDone: false,
+  saveOtherUrls: false,
+  showCreateFolder: false,
+
+  openFromShare: async (share) => {
+    const parsed = parseShareToDraft(share);
+
+    if (!parsed.draft) {
+      // No URL anywhere in the payload. Do not invent a link: say so plainly and
+      // write nothing to the vault.
+      set({
+        status: 'open',
+        mode: 'share',
+        draft: null,
+        unreadable: parsed.share,
+        duplicates: [],
+        duplicateCheckDone: true,
+        showCreateFolder: false,
+      });
+      return;
+    }
+
+    const draft: CaptureDraft = {
+      url: parsed.draft.url,
+      title: parsed.draft.title ?? '',
+      note: parsed.draft.note ?? '',
+      rawText: parsed.share.rawText,
+      domain: parsed.draft.domain,
+      otherUrls: parsed.draft.otherUrls,
+      receivedAt: parsed.draft.receivedAt,
+    };
+    if (parsed.draft.sourceLabel) draft.sourceLabel = parsed.draft.sourceLabel;
+    if (parsed.draft.sourcePackage) draft.sourcePackage = parsed.draft.sourcePackage;
+    if (parsed.draft.appLabel) draft.appLabel = parsed.draft.appLabel;
+
+    set({
+      status: 'open',
+      mode: 'share',
+      unreadable: null,
+      draft,
+      destination: defaultDestination(),
+      duplicateAcknowledged: false,
+      duplicates: [],
+      duplicateCheckDone: false,
+      saveOtherUrls: false,
+      showCreateFolder: false,
+    });
+
+    await get().recheckDuplicates();
+  },
+
+  openManual: () => {
+    set({
+      status: 'open',
+      mode: 'manual',
+      draft: emptyDraft(),
+      unreadable: null,
+      destination: defaultDestination(),
+      duplicateAcknowledged: false,
+      duplicates: [],
+      duplicateCheckDone: false,
+      saveOtherUrls: false,
+      showCreateFolder: false,
+    });
+  },
+
+  setDraftField: (field, value) => {
+    const draft = get().draft;
+    if (!draft) return;
+    const next: CaptureDraft = { ...draft, [field]: value };
+    if (field === 'url') {
+      next.domain = domainOf(value);
+      const label = labelForDomain(next.domain);
+      if (label) next.sourceLabel = label;
+      else delete next.sourceLabel;
+      // The URL changed, so any previous duplicate verdict is stale. Clearing it
+      // here prevents acting on a result that no longer matches what is shown.
+      set({ draft: next, duplicateCheckDone: false, duplicates: [], duplicateAcknowledged: false });
+      return;
+    }
+    set({ draft: next });
+  },
+
+  setSaveOtherUrls: (value) => set({ saveOtherUrls: value }),
+
+  selectDestination: (selection) => set({ destination: selection, showCreateFolder: false }),
+
+  setShowCreateFolder: (value) => set({ showCreateFolder: value }),
+
+  recheckDuplicates: async () => {
+    const draft = get().draft;
+    if (!draft || !isHttpUrl(draft.url)) {
+      set({ duplicates: [], duplicateCheckDone: true });
+      return;
+    }
+    const duplicates = await useVaultStore.getState().duplicatesFor(draft.url);
+    set({ duplicates, duplicateCheckDone: true });
+  },
+
+  acknowledgeDuplicate: () => set({ duplicateAcknowledged: true }),
+
+  save: async () => {
+    const { draft, destination, saveOtherUrls, duplicateAcknowledged } = get();
+    if (!draft) return { ok: false, reason: 'unavailable' };
+
+    const url = draft.url.trim();
+    if (!isHttpUrl(url)) return { ok: false, reason: 'invalid-url' };
+
+    set({ status: 'saving' });
+
+    // Re-check at write time: the vault may have changed since the sheet opened.
+    const duplicates = await useVaultStore.getState().duplicatesFor(url);
+    if (duplicates.length > 0 && !duplicateAcknowledged) {
+      set({ status: 'open', duplicates, duplicateCheckDone: true });
+      return { ok: false, reason: 'duplicate' };
+    }
+
+    const folderId = destinationFolderId(destination);
+    const isFavorite = destinationIsFavorite(destination);
+
+    const vault = useVaultStore.getState();
+    const link = await vault.saveLink({
+      url,
+      folderId,
+      isFavorite,
+      ...(draft.title ? { title: draft.title } : {}),
+      ...(draft.note ? { userNote: draft.note } : {}),
+      ...(draft.rawText ? { rawText: draft.rawText } : {}),
+      source: draft.domain || domainOf(url),
+      ...(draft.sourcePackage ? { sourcePackage: draft.sourcePackage } : {}),
+    });
+
+    // Secondary links are best-effort: an already-known extra must never turn a
+    // successful primary save into a failure.
+    let savedCount = 1;
+    const extras = saveOtherUrls ? draft.otherUrls : [];
+    for (const extra of extras) {
+      const extraDuplicates = await useVaultStore.getState().duplicatesFor(extra);
+      if (extraDuplicates.length > 0) continue;
+      await vault.saveLink({
+        url: extra,
+        folderId,
+        source: domainOf(extra),
+        ...(draft.rawText ? { rawText: draft.rawText } : {}),
+      });
+      savedCount += 1;
+    }
+
+    set({
+      status: 'idle',
+      draft: null,
+      duplicates: [],
+      duplicateCheckDone: false,
+      saveOtherUrls: false,
+      showCreateFolder: false,
+    });
+    return { ok: true, link, savedCount };
+  },
+
+  moveExisting: async (linkId) => {
+    const { destination } = get();
+    const folderId = destinationFolderId(destination);
+    await useVaultStore.getState().moveLink(linkId, folderId);
+    if (destinationIsFavorite(destination)) {
+      await useVaultStore.getState().toggleLinkFavorite(linkId, true);
+    }
+    set({ status: 'idle', draft: null, duplicates: [], duplicateCheckDone: false, showCreateFolder: false });
+    return { ok: true };
+  },
+
+  reset: () =>
+    set({
+      status: 'idle',
+      draft: null,
+      unreadable: null,
+      duplicates: [],
+      duplicateCheckDone: false,
+      showCreateFolder: false,
+      duplicateAcknowledged: false,
+      saveOtherUrls: false,
+    }),
+}));
+
+/**
+ * Where a fresh capture should land.
+ *
+ * Recent destinations win because repeat captures ("that goes in Development
+ * again") are the common case; otherwise Inbox, so saving never begins with a
+ * decision the user did not ask to make.
+ */
+function defaultDestination(): DestinationSelection {
+  const { folders, recentFolderIds } = useVaultStore.getState();
+  const known = new Set(folders.map((folder) => folder.id));
+  const recent = recentFolderIds.find((id) => known.has(id));
+  return recent ? folderDestination(recent) : INBOX_DESTINATION;
+}
+
