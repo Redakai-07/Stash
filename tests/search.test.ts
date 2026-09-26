@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Folder, LinkTag, SavedLink, Tag } from '@/db/types';
+import type { Folder, LinkTag, Note, NoteLink, SavedLink, Tag } from '@/db/types';
 import { searchVault, tokenize, type VaultSnapshot } from '@/lib/search';
 
 function folder(id: string, name: string, parentId: string | null = null): Folder {
@@ -66,7 +66,24 @@ const links: SavedLink[] = [
   }),
 ];
 
-const snapshot: VaultSnapshot = { folders, links, tags, linkTags, notes: [], noteLinks: [] };
+const notes: Note[] = [
+  {
+    id: 'n-ml',
+    parentNoteId: null,
+    title: 'Machine Learning',
+    content: 'Notes from the SVM lecture series',
+    createdAt: 300,
+    updatedAt: 300,
+    sortOrder: 0,
+    isFavorite: false,
+    isArchived: false,
+    isLocked: false,
+  },
+];
+
+const noteLinks: NoteLink[] = [{ noteId: 'n-ml', linkId: 'l1', origin: 'attached', createdAt: 300, sortOrder: 0 }];
+
+const snapshot: VaultSnapshot = { folders, links, tags, linkTags, notes, noteLinks };
 
 function ids(query: string, filter?: Parameters<typeof searchVault>[1]['filter']) {
   return searchVault(snapshot, { query, ...(filter ? { filter } : {}) }).links.map((hit) => hit.link.id);
@@ -146,8 +163,27 @@ describe('searchVault', () => {
     expect(ids('', 'favorites')).toEqual(['l3']);
   });
 
-  it('applies the notes filter', () => {
-    expect(ids('', 'notes')).toEqual(['l1']);
+  it('applies the notes filter: notes surface, links step aside', () => {
+    expect(ids('', 'notes')).toEqual([]);
+    const noteHits = searchVault(snapshot, { query: '', filter: 'notes' }).notes;
+    expect(noteHits.map((hit) => hit.note.id)).toEqual(['n-ml']);
+  });
+
+  it('searches notes by title and content, with attachment titles', () => {
+    const byTitle = searchVault(snapshot, { query: 'machine' }).notes;
+    expect(byTitle.map((hit) => hit.note.id)).toEqual(['n-ml']);
+
+    const byContent = searchVault(snapshot, { query: 'svm lecture' }).notes;
+    expect(byContent.map((hit) => hit.note.id)).toEqual(['n-ml']);
+
+    const hit = byTitle[0];
+    expect(hit?.resourceTitles).toContain('Binary Search Explained');
+  });
+
+  it('finds a link through a note that references it, and vice versa', () => {
+    // The note's content mentions the lecture; the attached link still matches its own fields.
+    const linkHit = searchVault(snapshot, { query: 'binary' }).links[0];
+    expect(linkHit?.link.id).toBe('l1');
   });
 
   it('sorts the recent filter purely by date', () => {
