@@ -85,6 +85,31 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
     close();
   };
 
+  const attachToNote = async (noteId: string) => {
+    setBusy(true);
+    const ok = await useVaultStore.getState().attachLink(noteId, link.id, 'attached');
+    setBusy(false);
+    if (!ok) {
+      toast('Already attached to that note', { tone: 'danger' });
+      return;
+    }
+    toast('Attached to note', { tone: 'success' });
+    close();
+  };
+
+  const createNote = async () => {
+    setBusy(true);
+    const result = await useVaultStore.getState().createNoteFromLink(link.id);
+    setBusy(false);
+    if (!result.ok) {
+      toast(result.message, { tone: 'danger' });
+      return;
+    }
+    toast('Note created', { tone: 'success' });
+    close();
+    router.push(`/notes?note=${result.note.id}`);
+  };
+
   const remove = async () => {
     setBusy(true);
     const removed = link;
@@ -153,6 +178,15 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
               showInbox
               filterPlaceholder="Find a folder"
             />
+          ) : mode === 'attach-note' ? (
+            <NotePicker
+              notes={notes.filter((candidate) => !candidate.isArchived)}
+              selectedNoteId={null}
+              onSelect={(parentId) => {
+                if (parentId) void attachToNote(parentId);
+              }}
+              filterPlaceholder="Find a note"
+            />
           ) : mode === 'confirm-delete' ? (
             <div className="px-3 pb-2">
               <div className="rounded-xl border border-danger/30 bg-danger-soft p-3.5">
@@ -214,6 +248,28 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
                 ) : null}
               </div>
 
+              {referencingNotes.length > 0 ? (
+                <div className="rounded-xl border border-border bg-surface-2 px-3.5 py-3">
+                  <p className="text-[0.6875rem] font-semibold tracking-wider text-subtle uppercase">Referenced in</p>
+                  <div className="mt-2 flex flex-col gap-1">
+                    {referencingNotes.map((ref) => (
+                      <button
+                        key={ref.id}
+                        type="button"
+                        onClick={() => {
+                          close();
+                          router.push(`/notes?note=${ref.id}`);
+                        }}
+                        className="tap flex items-center gap-2 rounded-lg px-1.5 py-1.5 text-left active:bg-surface-2"
+                      >
+                        <NotebookPen size={14} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden />
+                        <span className="truncate text-[0.875rem] text-fg">{ref.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               <ActionRow
                 icon={<ExternalLink size={18} strokeWidth={1.9} aria-hidden />}
                 label="Open link"
@@ -238,6 +294,16 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
                   void useVaultStore.getState().toggleLinkFavorite(link.id);
                   close();
                 }}
+              />
+              <ActionRow
+                icon={<FilePlus2 size={18} strokeWidth={1.9} aria-hidden />}
+                label="Create note from link"
+                onClick={() => void createNote()}
+              />
+              <ActionRow
+                icon={<NotebookPen size={18} strokeWidth={1.9} aria-hidden />}
+                label={referencingNotes.length > 0 ? 'Attach to another note' : 'Attach to a note'}
+                onClick={() => setMode('attach-note')}
               />
               <ActionRow
                 icon={<FolderInput size={18} strokeWidth={1.9} aria-hidden />}
@@ -267,6 +333,14 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
           <SheetFooter>
             <Button variant="surface" className="w-full" onClick={close}>
               Close
+            </Button>
+          </SheetFooter>
+        ) : null}
+        {mode === 'attach-note' ? (
+          <SheetFooter>
+            <Button variant="accentSoft" className="w-full" onClick={() => void createNote()} disabled={busy}>
+              <FilePlus2 size={17} strokeWidth={2} aria-hidden />
+              New note from this link
             </Button>
           </SheetFooter>
         ) : null}

@@ -1,0 +1,123 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.2 [39m[90mD:/Projects/Stash[39m
+
+ [32m✓[39m tests/tree.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m tests/url.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32m✓[39m tests/share.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [31m❯[39m tests/search.test.ts [2m([22m[2m18 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 34[2mms[22m[39m
+   [32m✓[39m tokenize [2m(1)[22m
+     [32m✓[39m splits on whitespace and punctuation and lower-cases[32m 4[2mms[22m[39m
+   [31m❯[39m searchVault [2m(17)[22m
+     [32m✓[39m finds by title[32m 2[2mms[22m[39m
+     [32m✓[39m finds by URL and by domain[32m 2[2mms[22m[39m
+     [32m✓[39m finds by the user note[32m 0[2mms[22m[39m
+     [32m✓[39m finds by tag[32m 0[2mms[22m[39m
+     [32m✓[39m finds by folder name, including ancestors[32m 1[2mms[22m[39m
+     [32m✓[39m ranks a title match above a weak body match[32m 1[2mms[22m[39m
+     [32m✓[39m requires all tokens, then relaxes rather than returning nothing[32m 1[2mms[22m[39m
+     [32m✓[39m never returns archived links[32m 0[2mms[22m[39m
+     [32m✓[39m reports which fields matched[32m 1[2mms[22m[39m
+     [32m✓[39m resolves the folder path for each hit[32m 0[2mms[22m[39m
+     [32m✓[39m finds folders by name and by path[32m 1[2mms[22m[39m
+     [32m✓[39m returns recents newest-first for an empty query[32m 0[2mms[22m[39m
+     [32m✓[39m applies the favorites filter[32m 0[2mms[22m[39m
+[31m     [31m×[31m applies the notes filter[39m[32m 15[2mms[22m[39m
+     [32m✓[39m sorts the recent filter purely by date[32m 1[2mms[22m[39m
+     [32m✓[39m honours the result limit[32m 1[2mms[22m[39m
+     [32m✓[39m can skip folder results for a lightweight query[32m 0[2mms[22m[39m
+ [32m✓[39m tests/notes.test.ts [2m([22m[2m47 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32m✓[39m tests/notes-db.test.ts [2m([22m[2m31 tests[22m[2m)[22m[32m 189[2mms[22m[39m
+ [31m❯[39m tests/db.test.ts [2m([22m[2m37 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 207[2mms[22m[39m
+   [32m✓[39m boot and persistence [2m(4)[22m
+     [32m✓[39m opens the vault[32m 12[2mms[22m[39m
+     [32m✓[39m seeds starter folders exactly once[32m 16[2mms[22m[39m
+     [32m✓[39m keeps the seeded flag in the meta table[32m 5[2mms[22m[39m
+     [32m✓[39m survives a close and reopen without losing data[32m 5[2mms[22m[39m
+   [32m✓[39m folders [2m(9)[22m
+     [32m✓[39m creates arbitrary nested folders through parentId[32m 6[2mms[22m[39m
+     [32m✓[39m rejects a duplicate name in the same parent and offers the existing one[32m 11[2mms[22m[39m
+     [32m✓[39m allows the same name under different parents[32m 6[2mms[22m[39m
+     [32m✓[39m rejects an empty name[32m 4[2mms[22m[39m
+     [32m✓[39m renames a folder and refuses a clashing name[32m 6[2mms[22m[39m
+     [32m✓[39m moves a folder and refuses to create a cycle[32m 7[2mms[22m[39m
+     [32m✓[39m reorders siblings[32m 9[2mms[22m[39m
+     [32m✓[39m toggles favorite state[32m 4[2mms[22m[39m
+     [32m✓[39m counts direct and nested links for every ancestor[32m 6[2mms[22m[39m
+   [32m✓[39m folder deletion never loses data silently [2m(3)[22m
+     [32m✓[39m move-contents-up keeps links and promotes subfolders[32m 10[2mms[22m[39m
+     [32m✓[39m re-homes contents into the grandparent when there is one[32m 4[2mms[22m[39m
+     [32m✓[39m delete-everything removes the subtree and its links[32m 9[2mms[22m[39m
+   [32m✓[39m links and duplicate detection [2m(11)[22m
+     [32m✓[39m stores the original URL untouched and a normalized form separately[32m 2[2mms[22m[39m
+     [32m✓[39m derives the source domain when none is given[32m 2[2mms[22m[39m
+     [32m✓[39m detects an exact duplicate through aliases[32m 3[2mms[22m[39m
+     [32m✓[39m does not flag a genuinely different resource[32m 6[2mms[22m[39m
+     [32m✓[39m ignores its own record when editing[32m 3[2mms[22m[39m
+     [32m✓[39m reports the Inbox for links with no folder[32m 2[2mms[22m[39m
+     [32m✓[39m lists Inbox links, which cannot be reached through the folderId index[32m 3[2mms[22m[39m
+     [32m✓[39m can include nested links[32m 2[2mms[22m[39m
+     [32m✓[39m edits a link and clears empty fields[32m 2[2mms[22m[39m
+     [32m✓[39m filters favorites with a scan, since IndexedDB cannot index booleans[32m 2[2mms[22m[39m
+     [32m✓[39m round-trips tags and normalizes their names[32m 7[2mms[22m[39m
+   [32m✓[39m capture destinations [2m(2)[22m
+     [32m✓[39m remembers recently used folders, newest first and de-duplicated[32m 6[2mms[22m[39m
+     [32m✓[39m drops destinations that no longer exist[32m 6[2mms[22m[39m
+   [31m❯[39m export and import [2m(6)[22m
+[31m     [31m×[31m produces a self-describing bundle[39m[32m 9[2mms[22m[39m
+     [32m✓[39m rejects a foreign file[32m 1[2mms[22m[39m
+     [32m✓[39m imports into a fresh vault, keeping folder relationships[32m 7[2mms[22m[39m
+     [32m✓[39m is idempotent: importing the same file twice changes nothing[32m 3[2mms[22m[39m
+     [32m✓[39m re-homes links whose folder is missing from the bundle[32m 1[2mms[22m[39m
+     [32m✓[39m replace mode clears the vault first[32m 2[2mms[22m[39m
+   [32m✓[39m schema migration [2m(2)[22m
+     [32m✓[39m upgrades a version 1 vault to version 2 and backfills normalizedUrl[32m 7[2mms[22m[39m
+     [32m✓[39m keeps unrelated preferences across a migration[32m 9[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/db.test.ts[2m > [22mexport and import[2m > [22mproduces a self-describing bundle
+[31m[1mAssertionError[22m: expected 2 to be 1 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 2[39m
+
+[36m [2m❯[22m tests/db.test.ts:[2m310:28[22m[39m
+    [90m308|[39m     const bundle = await exportVault();
+    [90m309|[39m     expect(bundle.format).toBe('stash-export');
+    [90m310|[39m     expect(bundle.version).toBe(1);
+    [90m   |[39m                            [31m^[39m
+    [90m311|[39m     expect(bundle.links).toHaveLength(1);
+    [90m312|[39m     expect(isValidBundle(bundle)).toBe(true);
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/search.test.ts[2m > [22msearchVault[2m > [22mapplies the notes filter
+[31m[1mAssertionError[22m: expected [] to deeply equal [ 'l1' ][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [[39m
+[32m-   "l1",[39m
+[32m- ][39m
+[31m+ [][39m
+
+[36m [2m❯[22m tests/search.test.ts:[2m150:30[22m[39m
+    [90m148|[39m
+    [90m149|[39m   it('applies the notes filter', () => {
+    [90m150|[39m     expect(ids('', 'notes')).toEqual(['l1']);
+    [90m   |[39m                              [31m^[39m
+    [90m151|[39m   });
+    [90m152|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m5 passed[39m[22m[90m (7)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m193 passed[39m[22m[90m (195)[39m
+[2m   Start at [22m 21:35:14
+[2m   Duration [22m 1.09s[2m (transform 48%, import 18%, tests 17%, setup 15%, worker 2%)[22m
+

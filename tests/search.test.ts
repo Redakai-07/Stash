@@ -66,7 +66,7 @@ const links: SavedLink[] = [
   }),
 ];
 
-const snapshot: VaultSnapshot = { folders, links, tags, linkTags };
+const snapshot: VaultSnapshot = { folders, links, tags, linkTags, notes: [], noteLinks: [] };
 
 function ids(query: string, filter?: Parameters<typeof searchVault>[1]['filter']) {
   return searchVault(snapshot, { query, ...(filter ? { filter } : {}) }).links.map((hit) => hit.link.id);

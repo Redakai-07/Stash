@@ -35,7 +35,8 @@ export interface MoveMessages {
   tooDeep: string;
 }
 
-export interface MoveOptions<T> {
+/** Options for the guarded move check. Type comes from the accessor. */
+export interface MoveOptions {
   /** Nesting cap. A guard rail against runaway imports, not a product rule. */
   maxDepth: number;
   messages: MoveMessages;
@@ -185,7 +186,7 @@ export function treeCanMove<T>(
   nodeId: string,
   targetParentId: string | null,
   accessor: TreeAccessor<T>,
-  options: MoveOptions<T>,
+  options: MoveOptions,
 ): MoveCheck {
   if (targetParentId === null) return { ok: true };
   if (targetParentId === nodeId) return { ok: false, reason: options.messages.intoSelf };

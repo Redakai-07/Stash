@@ -56,7 +56,6 @@ import {
   getNoteDeletionImpact,
   renameNote as renameNoteRepo,
   reorderNote as reorderNoteRepo,
-  saveNoteContent as saveNoteContentRepo,
   setNoteArchived,
   setNoteFavorite,
   setNoteLocked,

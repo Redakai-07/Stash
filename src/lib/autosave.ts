@@ -124,9 +124,10 @@ export class AutosaveController<T> {
     this.cancelTimer();
 
     // Loop rather than recurse: a value that arrives *during* a write still gets
-    // written, and the loop always terminates because nothing is scheduled
-    // synchronously inside `save`.
-    // eslint-disable-next-line no-constant-condition
+    // written. A FAILED write is the one place the loop must not continue: the
+    // value stays pending for a later retry, and re-attempting it immediately
+    // would spin forever against a persistently failing store. So after a
+    // failure flush returns, leaving the value queued and the status at `error`.
     while (true) {
       if (this.inFlight) {
         await this.inFlight;
@@ -139,18 +140,14 @@ export class AutosaveController<T> {
       this.pendingSince = 0;
       this.setStatus('saving');
 
+      let succeeded = false;
       const run = (async () => {
         try {
           await this.options.save(value);
           this.lastSavedAt = this.timers.now();
           this.setStatus('saved', { savedAt: this.lastSavedAt });
+          succeeded = true;
         } catch (error) {
-          // Keep the value so the next edit or flush retries it; a transient
-          // storage failure must not silently discard what the user wrote.
-          if (this.pendingValue === null) {
-            this.pendingValue = value;
-            this.pendingSince = this.timers.now();
-          }
           this.setStatus('error', { error });
         } finally {
           this.inFlight = null;
@@ -159,6 +156,16 @@ export class AutosaveController<T> {
 
       this.inFlight = run;
       await run;
+
+      if (!succeeded) {
+        // Queue the value again -- but never on top of a newer one that arrived
+        // while the failed write was in flight.
+        if (this.pendingValue === null) {
+          this.pendingValue = value;
+          this.pendingSince = this.timers.now();
+        }
+        return;
+      }
     }
   }
 

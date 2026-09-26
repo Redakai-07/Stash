@@ -4,8 +4,8 @@ import nextTypescript from 'eslint-config-next/typescript';
 /**
  * Flat ESLint config.
  *
- * `android/` is excluded because it is generated Gradle output with its own
- * toolchain, and `.next`/`out` are build artifacts.
+ * `android/` and `ios/` are excluded because they are generated native shell
+ * output with their own toolchains, and `.next`/`out` are build artifacts.
  */
 const config = [
   {
@@ -14,6 +14,7 @@ const config = [
       'out/**',
       'node_modules/**',
       'android/**',
+      'ios/**',
       'coverage/**',
       'next-env.d.ts',
     ],
