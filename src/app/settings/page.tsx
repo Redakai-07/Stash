@@ -1,10 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import { AlertTriangle, Download, Monitor, Moon, Shield, Sun, Trash2, Upload } from 'lucide-react';
-import { exportFileName, exportVault, importVault, isValidBundle } from '@/db/repos/vault';
+import { AlertTriangle, Monitor, Moon, Shield, Sun, Trash2, Upload } from 'lucide-react';
+import { PrivacySettings } from '@/components/privacy/privacy-settings';
+import { ExportPanel } from '@/components/backup/export-panel';
+import { ImportFlow } from '@/components/backup/import-flow';
 import { pluralize } from '@/lib/format';
 import { useVaultStore } from '@/stores/vault-store';
+import { useBackupStore } from '@/stores/backup-store';
 import { useThemeStore, type ThemeMode } from '@/stores/theme-store';
 import { Button } from '@/components/ui/button';
 import { PageHeader, PageTitle, Section } from '@/components/ui/page';
@@ -28,72 +31,11 @@ export default function SettingsPage() {
 
   const [busy, setBusy] = React.useState(false);
   const [confirmErase, setConfirmErase] = React.useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const beginImport = useBackupStore((state) => state.beginImport);
 
   const activeLinks = links.filter((link) => !link.isArchived);
   const archived = links.length - activeLinks.length;
   const notes = activeLinks.filter((link) => link.userNote?.trim()).length;
-
-  const handleExport = async () => {
-    setBusy(true);
-    try {
-      const bundle = await exportVault();
-      const name = exportFileName(new Date(bundle.exportedAt));
-      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
-
-      // Android browsers and the WebView can hand a File to the system share
-      // sheet, which is how a user gets a backup into Drive or Files.
-      const file = new File([blob], name, { type: 'application/json' });
-      const canShareFiles =
-        typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] });
-
-      if (canShareFiles) {
-        await navigator.share({ files: [file], title: name });
-      } else {
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = name;
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-        window.setTimeout(() => URL.revokeObjectURL(url), 4000);
-      }
-      toast('Export ready', { tone: 'success' });
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-      toast('Export failed', { tone: 'danger' });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleImportFile = async (file: File) => {
-    setBusy(true);
-    try {
-      const text = await file.text();
-      const parsed: unknown = JSON.parse(text);
-      if (!isValidBundle(parsed)) {
-        toast('That file is not a Stash export', { tone: 'danger' });
-        return;
-      }
-      const result = await importVault(parsed, 'merge');
-      await refresh();
-      if (!result.ok) {
-        toast(result.message ?? 'Import failed', { tone: 'danger' });
-        return;
-      }
-      toast(
-        `Imported ${pluralize(result.linksImported, 'link')} and ${pluralize(result.foldersImported, 'folder')}`,
-        { tone: 'success' },
-      );
-    } catch {
-      toast('Could not read that file', { tone: 'danger' });
-    } finally {
-      setBusy(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
 
   const handleErase = async () => {
     setBusy(true);
@@ -137,6 +79,8 @@ export default function SettingsPage() {
         </div>
       </Section>
 
+      <PrivacySettings />
+
       <Section title="Your vault">
         <div className="mx-4 overflow-hidden rounded-2xl border border-border bg-surface">
           <StatRow label="Saved links" value={pluralize(activeLinks.length, 'link')} />
@@ -152,33 +96,22 @@ export default function SettingsPage() {
       </Section>
 
       <Section title="Backup and restore">
-        <div className="mx-4 flex flex-col gap-2">
-          <Button variant="surface" className="justify-start" onClick={() => void handleExport()} disabled={busy}>
-            <Download size={18} strokeWidth={1.9} aria-hidden />
-            Export vault as JSON
-          </Button>
-          <Button
-            variant="surface"
-            className="justify-start"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={busy}
-          >
+        <ExportPanel />
+
+        <div className="mx-4 mt-4 flex flex-col gap-2">
+          <Button variant="surface" className="justify-start" onClick={() => void beginImport()}>
             <Upload size={18} strokeWidth={1.9} aria-hidden />
-            Import a Stash export
+            Restore from a backup
           </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="application/json,.json"
-            className="hidden"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void handleImportFile(file);
-            }}
-          />
           <p className="px-1 text-xs leading-relaxed text-subtle">
-            Import merges by default: items already in your vault are skipped, so running the same file twice
-            never duplicates anything.
+            Opens the system file picker. The file is checked completely — format, version, structure and every
+            reference — before anything in your vault is touched, and you are shown what a restore would change
+            before agreeing to it.
+          </p>
+          <p className="px-1 text-xs leading-relaxed text-subtle">
+            &ldquo;Add what is missing&rdquo; never overwrites: an item that is already here is left alone, so importing the
+            same file twice cannot duplicate or damage anything. &ldquo;Replace everything&rdquo; clears the vault first and
+            writes a safety copy you can restore from.
           </p>
         </div>
       </Section>
@@ -213,9 +146,13 @@ export default function SettingsPage() {
       <div className="px-5 pb-8">
         <p className="flex items-center gap-1.5 text-xs text-subtle">
           <AlertTriangle size={13} strokeWidth={2} aria-hidden />
-          Stash v0.1 · Phase 1 · offline link vault
+          Stash v0.1 · offline vault for links and notes
         </p>
       </div>
+
+      {/* Mounted once for the whole page: the flow is driven by the store, so it
+          appears and disappears with the import rather than with a button. */}
+      <ImportFlow />
     </>
   );
 }

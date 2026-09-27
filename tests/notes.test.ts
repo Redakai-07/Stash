@@ -259,6 +259,7 @@ describe('note from link', () => {
     updatedAt: 1,
     isFavorite: false,
     isArchived: false,
+    isLocked: false,
   };
 
   it('titles from link title, source label, then the URL', () => {

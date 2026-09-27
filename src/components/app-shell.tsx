@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { FilePlus2, Plus } from 'lucide-react';
 import { BottomNav } from './bottom-nav';
 import { CaptureSheet } from './capture/capture-sheet';
+import { LockGate } from './privacy/lock-gate';
 import { Toaster, toast } from './ui/toast';
 import { useCaptureStore } from '@/stores/capture-store';
 import { useVaultStore } from '@/stores/vault-store';
@@ -74,6 +75,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <BottomNav />
       <CaptureSheet />
       <Toaster />
+      {/* Last so it paints over the shell, the sheets and the toasts alike. */}
+      <LockGate />
     </div>
   );
 }

@@ -50,6 +50,7 @@ function SearchView() {
   const linkTags = useVaultStore((state) => state.linkTags);
   const notes = useVaultStore((state) => state.notes);
   const noteLinks = useVaultStore((state) => state.noteLinks);
+  const hidden = useVaultStore((state) => state.hidden);
   const toggleLinkFavorite = useVaultStore((state) => state.toggleLinkFavorite);
   const markLinkOpened = useVaultStore((state) => state.markLinkOpened);
 
@@ -68,9 +69,13 @@ function SearchView() {
           folderLimit: searching ? 8 : 0,
           noteLimit: 80,
           includeFolders: searching,
+          // Belt and braces: the collections above are already filtered, and the
+          // search engine filters again from these sets. Two independent points
+          // have to be wrong before a locked item can appear in a result.
+          hidden,
         },
       ),
-    [folders, links, tags, linkTags, notes, noteLinks, query, filter, searching],
+    [folders, links, tags, linkTags, notes, noteLinks, hidden, query, filter, searching],
   );
 
   const folderNameById = React.useMemo(

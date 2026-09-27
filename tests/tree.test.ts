@@ -39,6 +39,7 @@ function link(id: string, folderId: string | null): SavedLink {
     updatedAt: 1,
     isFavorite: false,
     isArchived: false,
+    isLocked: false,
   };
 }
 

@@ -39,6 +39,9 @@ function NotesView() {
   const visibleNotes = useVaultStore((state) => state.visibleNotes);
   const links = useVaultStore((state) => state.links);
   const noteLinks = useVaultStore((state) => state.noteLinks);
+  // Inherited locks count: a subnote of a locked note is encrypted too, so it
+  // must open read-only even though its own flag is false.
+  const protectedNoteIds = useVaultStore((state) => state.protection.notes);
 
   const [activeNote, setActiveNote] = React.useState<Note | null>(null);
   const [activeLink, setActiveLink] = React.useState<SavedLink | null>(null);
@@ -217,8 +220,10 @@ function NotesView() {
         <NoteEditor
           key={current.id}
           note={current}
-          readOnly={current.isLocked}
-          onUnlock={() => void useVaultStore.getState().toggleNoteLocked(current.id, false)}
+          readOnly={protectedNoteIds.has(current.id)}
+          {...(current.isLocked
+            ? { onUnlock: () => void useVaultStore.getState().toggleNoteLocked(current.id, false) }
+            : {})}
           save={async (draft) => {
             await useVaultStore.getState().saveNoteDraft(current.id, draft);
           }}
@@ -262,7 +267,7 @@ function NotesView() {
 
         <NoteResources
           links={resources}
-          readOnly={current.isLocked}
+          readOnly={protectedNoteIds.has(current.id)}
           onOpenLink={openLink}
           onDetach={(linkId) => {
             void useVaultStore.getState().detachLink(current.id, linkId);

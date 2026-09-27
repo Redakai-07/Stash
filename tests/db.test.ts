@@ -307,8 +307,8 @@ describe('export and import', () => {
     await createLink({ url: 'https://example.com/a', folderId: null, title: 'A' });
     const bundle = await exportVault();
     expect(bundle.format).toBe('stash-export');
-    // Version 2 bundles carry notes and note references.
-    expect(bundle.version).toBe(2);
+    // Version 3 bundles carry notes, note references and the privacy keyring.
+    expect(bundle.version).toBe(3);
     expect(bundle.links).toHaveLength(1);
     expect(bundle.notes).toEqual([]);
     expect(isValidBundle(bundle)).toBe(true);

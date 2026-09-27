@@ -1,9 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { MoreHorizontal, Star } from 'lucide-react';
+import { Lock, MoreHorizontal, Star } from 'lucide-react';
 import type { SavedLink } from '@/db/types';
 import { displayUrl, formatRelative, tintForId } from '@/lib/format';
+import { useVaultStore } from '@/stores/vault-store';
 import { cn } from '@/lib/utils';
 
 /**
@@ -46,6 +47,9 @@ export function LinkRow({
   highlight = false,
   className,
 }: LinkRowProps) {
+  // The row subscribes to the lock set rather than taking a prop, so a new list
+  // cannot forget to mark a locked item.
+  const locked = useVaultStore((state) => state.protection.links.has(link.id));
   const tint = TINT_CLASS[tintForId(link.source ?? link.id)] ?? TINT_CLASS.accent;
   const initial = (link.source ?? 'link').replace(/^www\./, '').slice(0, 1).toUpperCase();
 
@@ -107,6 +111,14 @@ export function LinkRow({
             <span className="min-w-0 truncate text-[0.9375rem] leading-tight font-medium text-fg">
               {link.title?.trim() || displayUrl(link.url, 54)}
             </span>
+            {locked ? (
+              <Lock
+                size={12}
+                strokeWidth={2.4}
+                className="shrink-0 text-accent"
+                aria-label="Locked"
+              />
+            ) : null}
             {link.isFavorite ? (
               <Star size={12} strokeWidth={2.4} className="shrink-0 text-warning" aria-label="Favorite" />
             ) : null}

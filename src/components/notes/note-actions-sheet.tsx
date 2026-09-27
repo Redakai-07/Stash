@@ -17,7 +17,9 @@ import {
 import type { Note, NoteDeletionImpact } from '@/db/types';
 import { pluralize } from '@/lib/format';
 import { useBackDismiss } from '@/hooks/use-back-dismiss';
+import { useRouter } from 'next/navigation';
 import { useVaultStore, selectChildNotes, selectDescendantNoteCount } from '@/stores/vault-store';
+import { usePrivacyStore } from '@/stores/privacy-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
@@ -45,7 +47,11 @@ export interface NoteActionsSheetProps {
 }
 
 export function NoteActionsSheet({ note, onClose, onOpenNote, onDeleted }: NoteActionsSheetProps) {
+  const router = useRouter();
   const notes = useVaultStore((state) => state.notes);
+  const keyringPresent = usePrivacyStore((state) => state.keyringPresent);
+  const protectedId = note?.id ?? '';
+  const isProtected = useVaultStore((state) => state.protection.notes.has(protectedId));
   const [mode, setMode] = React.useState<Mode>('actions');
   const [title, setTitle] = React.useState(note?.title ?? '');
   const [impact, setImpact] = React.useState<NoteDeletionImpact | null>(null);
@@ -297,10 +303,31 @@ export function NoteActionsSheet({ note, onClose, onOpenNote, onDeleted }: NoteA
                     <Lock size={18} strokeWidth={1.9} aria-hidden />
                   )
                 }
-                label={note.isLocked ? 'Unlock to edit again' : 'Lock against editing'}
+                label={
+                  isProtected && !note.isLocked
+                    ? 'Locked by a parent note'
+                    : note.isLocked
+                      ? 'Unlock this note and its subnotes'
+                      : 'Lock this note and its subnotes'
+                }
                 onClick={() => {
-                  void useVaultStore.getState().toggleNoteLocked(note.id);
-                  toast(note.isLocked ? 'Unlocked' : 'Locked — reading only', { tone: 'success' });
+                  if (!keyringPresent) {
+                    toast('Set a Stash passcode first', { tone: 'danger' });
+                    close();
+                    router.push('/settings');
+                    return;
+                  }
+                  if (isProtected && !note.isLocked) {
+                    toast('A subnote of a locked note inherits its lock. Unlock the parent note instead.');
+                    return;
+                  }
+                  const next = !note.isLocked;
+                  void useVaultStore.getState().toggleNoteLocked(note.id).then(() => {
+                    toast(
+                      next ? 'Locked — title and body are now encrypted' : 'Unlocked',
+                      { tone: 'success' },
+                    );
+                  });
                   close();
                 }}
               />
@@ -313,6 +340,12 @@ export function NoteActionsSheet({ note, onClose, onOpenNote, onDeleted }: NoteA
                   close();
                 }}
               />
+              {!keyringPresent ? (
+                <p className="px-2 pt-1 text-xs leading-relaxed text-subtle">
+                  Locking encrypts a note and its subnotes so they are unreadable while Stash is locked. Set a
+                  passcode in Settings to turn it on.
+                </p>
+              ) : null}
               {resourceCount > 0 ? (
                 <p className="flex items-center gap-1.5 px-2 pt-1 text-xs text-subtle">
                   <Link2 size={13} strokeWidth={2} aria-hidden />

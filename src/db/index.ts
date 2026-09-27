@@ -8,6 +8,7 @@ import {
   type Note,
   type NoteLink,
   type SavedLink,
+  type SecurityRow,
   type Tag,
 } from './types';
 
@@ -33,6 +34,14 @@ class StashDatabase extends Dexie {
   notes!: Table<Note, string>;
   noteLinks!: Table<NoteLink, [string, string]>;
   meta!: Table<MetaRow, string>;
+  /**
+   * Wrapping material and security bookkeeping.
+   *
+   * Its own table so that "is this exported, imported, snapshotted or searched?"
+   * has a structural answer — no — rather than depending on every future listing
+   * path remembering to exclude a key from `meta`.
+   */
+  security!: Table<SecurityRow, string>;
 
   constructor(name = 'stash') {
     super(name);
@@ -111,6 +120,35 @@ class StashDatabase extends Dexie {
         await transaction.table<MetaRow, string>('meta').put({
           key: META_KEYS.schemaInfo,
           value: { version: 3, migratedAt: Date.now() },
+        });
+      });
+
+    // ---- Version 4: privacy and locking ------------------------------------------
+    // Additive again: one new table for key material and security bookkeeping.
+    // Existing rows gain an optional `enc` ciphertext field and `SavedLink` gains
+    // `isLocked`, both of which are simply absent on old rows and are treated as
+    // "not sealed" and "not locked". Nothing is read, rewritten or reordered
+    // here, so a vault that never uses locking is byte-for-byte unaffected.
+    this.version(4)
+      .stores({
+        folders: 'id, parentId, name, sortOrder, updatedAt, [parentId+sortOrder]',
+        links:
+          'id, folderId, normalizedUrl, createdAt, updatedAt, lastOpenedAt, [folderId+createdAt]',
+        tags: 'id, &name',
+        linkTags: '[linkId+tagId], linkId, tagId',
+        notes: 'id, parentNoteId, title, sortOrder, createdAt, updatedAt, [parentNoteId+sortOrder]',
+        noteLinks: '[noteId+linkId], noteId, linkId, createdAt',
+        meta: 'key',
+        security: 'key',
+      })
+      .upgrade(async (transaction) => {
+        const links = transaction.table<SavedLink, string>('links');
+        await links.toCollection().modify((link) => {
+          if (typeof link.isLocked !== 'boolean') link.isLocked = false;
+        });
+        await transaction.table<MetaRow, string>('meta').put({
+          key: META_KEYS.schemaInfo,
+          value: { version: 4, migratedAt: Date.now() },
         });
       });
 

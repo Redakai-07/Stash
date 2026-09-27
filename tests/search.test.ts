@@ -23,6 +23,7 @@ function link(partial: Partial<SavedLink> & { id: string; url: string }): SavedL
     updatedAt: 100,
     isFavorite: false,
     isArchived: false,
+    isLocked: false,
     ...partial,
   };
 }

@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { getActiveShareBridge } from '@/lib/share/bridge';
 import { useCaptureStore } from '@/stores/capture-store';
+import { usePrivacyStore } from '@/stores/privacy-store';
 import { useThemeStore } from '@/stores/theme-store';
 import { useVaultStore } from '@/stores/vault-store';
 
@@ -18,11 +19,18 @@ export function AppBoot({ children }: { children: React.ReactNode }) {
   const initialize = useVaultStore((state) => state.initialize);
   const refresh = useVaultStore((state) => state.refresh);
   const initializeTheme = useThemeStore((state) => state.initialize);
+  const initializePrivacy = usePrivacyStore((state) => state.initialize);
 
   React.useEffect(() => {
-    void initializeTheme();
-    void initialize();
-  }, [initialize, initializeTheme]);
+    // Sequential because the privacy session has to be resolved *before* the
+    // vault is read: the read decides what is decryptable, and reading first
+    // would either show locked items or blank ones depending on timing.
+    void (async () => {
+      await initializeTheme();
+      await initialize();
+      await initializePrivacy();
+    })();
+  }, [initialize, initializePrivacy, initializeTheme]);
 
   // Re-read the vault when the app comes back to the foreground: Android may
   // have killed and restored the process while another app was on screen.
@@ -37,6 +45,70 @@ export function AppBoot({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   return <>{children}</>;
+}
+
+/**
+ * Keeps the vault in step with the privacy session.
+ *
+ * Two jobs, and both are about the session, not about the UI:
+ *
+ *  1. when the session locks or unlocks, the vault is re-read — which is what
+ *     removes locked items from every screen, because they are filtered out of
+ *     the store rather than hidden by a component;
+ *  2. when the app leaves the foreground, the re-lock policy is applied.
+ *
+ * Android may also kill the process while backgrounded, so the app state
+ * listener and the web `visibilitychange` event are both wired: the native event
+ * is authoritative when it fires, and the web one covers the PWA and desktop
+ * builds where there is no Capacitor runtime.
+ */
+export function PrivacySession() {
+  React.useEffect(() => {
+    return usePrivacyStore.subscribe((state, previous) => {
+      if (state.unlocked === previous.unlocked) return;
+      void useVaultStore.getState().refresh();
+    });
+  }, []);
+
+  React.useEffect(() => {
+    const privacy = () => usePrivacyStore.getState();
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') privacy().handleBackground();
+      else privacy().handleForeground();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    let detach: (() => void) | null = null;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const core = await import('@capacitor/core');
+        if (!core.Capacitor.isNativePlatform()) return;
+        const app = await import('@capacitor/app');
+        const handle = await app.App.addListener('appStateChange', ({ isActive }) => {
+          if (isActive) {
+            privacy().handleForeground();
+            void privacy().refreshCapabilities();
+          } else {
+            privacy().handleBackground();
+          }
+        });
+        if (cancelled) void handle.remove();
+        else detach = () => void handle.remove();
+      } catch {
+        /* no native app state: the web listener is enough */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisibility);
+      if (detach) detach();
+    };
+  }, []);
+
+  return null;
 }
 
 /**
@@ -111,6 +183,11 @@ export function BootSplash() {
 export function BootGate({ children }: { children: React.ReactNode }) {
   const status = useVaultStore((state) => state.status);
   const error = useVaultStore((state) => state.error);
+  // The vault is readable before the privacy session is resolved, but rendering
+  // then would flash the shell for a frame before the lock gate covers it. On a
+  // cold start with a passcode set, the very first painted frame should already
+  // be the lock screen.
+  const privacyReady = usePrivacyStore((state) => state.ready);
 
   if (status === 'error') {
     return (
@@ -124,6 +201,6 @@ export function BootGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (status === 'booting') return <BootSplash />;
+  if (status === 'booting' || !privacyReady) return <BootSplash />;
   return <>{children}</>;
 }

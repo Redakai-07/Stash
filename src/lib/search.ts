@@ -1,6 +1,7 @@
 import type { Folder, LinkTag, Note, NoteLink, SavedLink, Tag } from '@/db/types';
 import { notePlainText } from '@/lib/notes';
 import { breadcrumbOf, folderPathLabel, noteBreadcrumb } from '@/lib/tree';
+import { hiddenIds, type HiddenIds, type Protection } from '@/lib/privacy/protection';
 
 /**
  * Offline search across the whole vault.
@@ -265,7 +266,11 @@ export function linkHasNote(link: SavedLink): boolean {
   return Boolean((link.userNote && link.userNote.trim()) || (link.description && link.description.trim()));
 }
 
-function passesLinkFilter(link: SavedLink, filter: SearchFilter): boolean {
+function passesLinkFilter(link: SavedLink, filter: SearchFilter, hidden: HiddenIds): boolean {
+  // The lock check comes first and is absolute: a locked link is not a search
+  // result under any filter, including an empty query, a favourites filter or a
+  // recency listing. There is no filter combination that reveals it.
+  if (hidden.links.has(link.id)) return false;
   if (link.isArchived) return false;
   switch (filter) {
     case 'favorites':
@@ -281,7 +286,10 @@ function passesLinkFilter(link: SavedLink, filter: SearchFilter): boolean {
   }
 }
 
-function passesNoteFilter(note: Note, filter: SearchFilter): boolean {
+function passesNoteFilter(note: Note, filter: SearchFilter, hidden: HiddenIds): boolean {
+  // A locked note contributes neither its title nor its path nor its body to
+  // search. `prepareNotes` never even reaches it.
+  if (hidden.notes.has(note.id)) return false;
   if (note.isArchived) return false;
   switch (filter) {
     case 'favorites':
@@ -305,6 +313,12 @@ export interface SearchOptions {
   folderLimit?: number;
   noteLimit?: number;
   includeFolders?: boolean;
+  /**
+   * Ids a locked session must not reveal. Pass `hiddenIds(protection, locked)`.
+   * Defaults to nothing hidden, so a caller that has no privacy context yet still
+   * gets a correct — if unfiltered — answer rather than a crash.
+   */
+  hidden?: HiddenIds;
 }
 
 export function searchVault(snapshot: VaultSnapshot, options: SearchOptions): SearchOutcome {
@@ -315,6 +329,7 @@ export function searchVault(snapshot: VaultSnapshot, options: SearchOptions): Se
     folderLimit = 20,
     noteLimit = 60,
     includeFolders = true,
+    hidden = hiddenIds({ folders: new Set(), notes: new Set(), links: new Set() }, false),
   } = options;
   const tokens = tokenize(query);
   const pathCache = new Map<string | null, string>();
@@ -323,7 +338,7 @@ export function searchVault(snapshot: VaultSnapshot, options: SearchOptions): Se
   // ---- Empty query: behave as a browsable, recency-ordered listing ----------
   if (tokens.length === 0) {
     const links = snapshot.links
-      .filter((link) => passesLinkFilter(link, filter))
+      .filter((link) => passesLinkFilter(link, filter, hidden))
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, limit)
       .map((link) => ({
@@ -335,7 +350,7 @@ export function searchVault(snapshot: VaultSnapshot, options: SearchOptions): Se
       }));
 
     const notes = preparedNotes
-      .filter((entry) => passesNoteFilter(entry.note, filter))
+      .filter((entry) => passesNoteFilter(entry.note, filter, hidden))
       .sort((a, b) => b.note.updatedAt - a.note.updatedAt)
       .slice(0, noteLimit)
       .map((entry) => ({
@@ -348,6 +363,7 @@ export function searchVault(snapshot: VaultSnapshot, options: SearchOptions): Se
 
     const folders = includeFolders
       ? snapshot.folders
+          .filter((folder) => !hidden.folders.has(folder.id))
           .slice()
           .sort((a, b) => b.updatedAt - a.updatedAt)
           .slice(0, folderLimit)
@@ -363,7 +379,7 @@ export function searchVault(snapshot: VaultSnapshot, options: SearchOptions): Se
   const scoreAll = (requireAll: boolean) => {
     const links: LinkHit[] = [];
     for (const entry of preparedLinks) {
-      if (!passesLinkFilter(entry.link, filter)) continue;
+      if (!passesLinkFilter(entry.link, filter, hidden)) continue;
       const scored = scoreFields(entry.fields, tokens, requireAll);
       if (scored.score === 0) continue;
       if (requireAll && !scored.satisfied) continue;
@@ -378,7 +394,7 @@ export function searchVault(snapshot: VaultSnapshot, options: SearchOptions): Se
 
     const notes: NoteHit[] = [];
     for (const entry of preparedNotes) {
-      if (!passesNoteFilter(entry.note, filter)) continue;
+      if (!passesNoteFilter(entry.note, filter, hidden)) continue;
       const scored = scoreFields(entry.fields, tokens, requireAll);
       if (scored.score === 0) continue;
       if (requireAll && !scored.satisfied) continue;
@@ -394,6 +410,7 @@ export function searchVault(snapshot: VaultSnapshot, options: SearchOptions): Se
     const folders: FolderHit[] = [];
     if (includeFolders) {
       for (const folder of snapshot.folders) {
+        if (hidden.folders.has(folder.id)) continue;
         const path = pathCache.get(folder.id) ?? folderPathLabel(snapshot.folders, folder.id);
         const entry = {
           folder,
@@ -443,3 +460,7 @@ export function folderChainLabels(folders: readonly Folder[], folderId: string |
   if (!folderId) return [];
   return breadcrumbOf(folders, folderId).map((folder) => folder.name);
 }
+
+/** Convenience re-export so callers of `searchVault` need one import, not two. */
+export { hiddenIds };
+export type { HiddenIds, Protection };

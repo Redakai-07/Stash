@@ -3,6 +3,10 @@ import { normalizeUrl } from '@/lib/url/normalize';
 import { descendantIdsOf, folderPathLabel } from '@/lib/tree';
 import { newId } from '../id';
 import { db, type SavedLink } from '../index';
+import { isFolderProtected } from '@/lib/privacy/context';
+import { getVaultKey } from '@/lib/privacy/keyring';
+import { isSealed, openLink, sealLink } from '@/lib/privacy/protection';
+import { reconcileProtection } from '@/lib/privacy/reconcile';
 
 /**
  * Link persistence.
@@ -36,6 +40,7 @@ export function buildLinkRecord(input: CreateLinkInput): SavedLink {
     updatedAt: now,
     isFavorite: input.isFavorite ?? false,
     isArchived: false,
+    isLocked: false,
   };
   if (input.title?.trim()) record.title = input.title.trim();
   if (input.description?.trim()) record.description = input.description.trim();
@@ -49,6 +54,16 @@ export function buildLinkRecord(input: CreateLinkInput): SavedLink {
 
 export async function createLink(input: CreateLinkInput): Promise<SavedLink> {
   const record = buildLinkRecord(input);
+
+  // Saving straight into a locked folder never writes the address in the clear:
+  // the row is sealed before it is inserted, so there is no window in which the
+  // URL exists plaintext on disk. The plaintext record is still what is returned,
+  // because the caller is by definition unlocked at this point.
+  if (await isFolderProtected(record.folderId)) {
+    await db.links.add(await sealLink(record, getVaultKey()));
+    return record;
+  }
+
   await db.links.add(record);
   return record;
 }
@@ -145,30 +160,48 @@ export interface UpdateLinkInput {
 }
 
 export async function updateLink(id: string, patch: UpdateLinkInput): Promise<SavedLink | null> {
-  return db.transaction('rw', db.links, async () => {
-    const link = await db.links.get(id);
-    if (!link) return null;
-    const updated: SavedLink = { ...link, updatedAt: Date.now() };
-    if (patch.title !== undefined) {
-      if (patch.title.trim()) updated.title = patch.title.trim();
-      else delete updated.title;
-    }
-    if (patch.description !== undefined) {
-      if (patch.description.trim()) updated.description = patch.description.trim();
-      else delete updated.description;
-    }
-    if (patch.userNote !== undefined) {
-      if (patch.userNote.trim()) updated.userNote = patch.userNote.trim();
-      else delete updated.userNote;
-    }
-    if (patch.folderId !== undefined) updated.folderId = patch.folderId;
-    await db.links.put(updated);
-    return updated;
-  });
+  // Not a Dexie transaction: WebCrypto resolves outside Dexie's zone, which ends
+  // the transaction and drops the write. See the note in `folders.ts`.
+  const raw = await db.links.get(id);
+  if (!raw) return null;
+  // Edit the plaintext view, then put it back the way it was found: a sealed
+  // link stays sealed, so an edit cannot leave a locked address in the clear.
+  const link = await openLink(raw, getVaultKey());
+  const updated = applyLinkPatch(link, patch);
+  await db.links.put(isSealed(raw) ? await sealLink(updated, getVaultKey()) : updated);
+  return updated;
 }
 
+/** Apply an edit to the plaintext view of a link. */
+function applyLinkPatch(link: SavedLink, patch: UpdateLinkInput): SavedLink {
+  const updated: SavedLink = { ...link, updatedAt: Date.now() };
+  if (patch.title !== undefined) {
+    if (patch.title.trim()) updated.title = patch.title.trim();
+    else delete updated.title;
+  }
+  if (patch.description !== undefined) {
+    if (patch.description.trim()) updated.description = patch.description.trim();
+    else delete updated.description;
+  }
+  if (patch.userNote !== undefined) {
+    if (patch.userNote.trim()) updated.userNote = patch.userNote.trim();
+    else delete updated.userNote;
+  }
+  if (patch.folderId !== undefined) updated.folderId = patch.folderId;
+  return updated;
+}
+
+/**
+ * Move a link to another folder.
+ *
+ * The move itself is a partial update, which preserves the sealed form, but it
+ * can cross a lock boundary in either direction — into a locked folder the link
+ * must be sealed, out of one it must be opened again — so sealing is re-derived
+ * afterwards.
+ */
 export async function moveLink(id: string, folderId: string | null): Promise<void> {
   await db.links.update(id, { folderId, updatedAt: Date.now() });
+  await reconcileProtection();
 }
 
 export async function setLinkFavorite(id: string, isFavorite: boolean): Promise<void> {
@@ -181,6 +214,12 @@ export async function setLinkArchived(id: string, isArchived: boolean): Promise<
 
 export async function touchLinkOpened(id: string): Promise<void> {
   await db.links.update(id, { lastOpenedAt: Date.now() });
+}
+
+/** Lock or unlock one saved link. Sealing follows from the flag. */
+export async function setLinkLocked(id: string, isLocked: boolean): Promise<void> {
+  await db.links.update(id, { isLocked, updatedAt: Date.now() });
+  await reconcileProtection();
 }
 
 /**

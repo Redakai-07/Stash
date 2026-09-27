@@ -173,7 +173,7 @@ export function NoteEditor({ note, save, readOnly = false, onUnlock }: NoteEdito
       <div className="flex items-center justify-between gap-2 px-4 pt-1 pb-2">
         <p className="min-w-0 truncate text-xs text-subtle">
           {readOnly
-            ? 'Locked · reading only'
+            ? 'Locked · encrypted, reading only'
             : mode === 'preview'
               ? 'Reading'
               : 'Markdown · tap a formatting button to insert'}
@@ -232,7 +232,9 @@ export function NoteEditor({ note, save, readOnly = false, onUnlock }: NoteEdito
           <div className="flex items-center gap-3 px-3 py-2">
             <span className="flex flex-1 items-center gap-2 text-[0.8125rem] text-muted">
               <Lock size={15} strokeWidth={2} aria-hidden />
-              This note is locked against editing.
+              {onUnlock
+                ? 'Encrypted. Unlock to edit again.'
+                : 'Locked by a parent note. Unlock that one to edit this.'}
             </span>
             {onUnlock ? (
               <button

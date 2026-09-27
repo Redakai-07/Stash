@@ -1,4 +1,14 @@
-import { db, META_KEYS, type MetaRow } from '../index';
+import {
+  db,
+  DEFAULT_PRIVACY_SETTINGS,
+  META_KEYS,
+  type MetaRow,
+  type PrivacySettings,
+  type RelockPolicy,
+} from '../index';
+import { isSessionLocked } from '@/lib/privacy/keyring';
+import { isSealed } from '@/lib/privacy/protection';
+import { isRelockPolicy } from '@/lib/privacy/session';
 
 /**
  * Small key-value store for preferences and capture history.
@@ -62,14 +72,63 @@ export async function setThemeMode(mode: ThemeMode): Promise<void> {
 }
 
 /**
- * Drop remembered destinations that point at folders which no longer exist.
- * Without this, deleting a folder could leave a dead shortcut in the Save Sheet.
+ * Drop remembered destinations that point at folders which no longer exist, and
+ * — while the vault is locked — at folders that are locked.
+ *
+ * Recents are persisted in plaintext `meta`, so a locked folder must not survive
+ * in that list: the Capture sheet would otherwise offer a destination whose name
+ * it is forbidden to reveal. Sealing is used as the test rather than recomputing
+ * full protection, because a protected folder is always a sealed one and this
+ * runs on every refresh.
  */
 export async function pruneRecentFolders(): Promise<string[]> {
   const ids = await getRecentFolderIds();
   if (ids.length === 0) return [];
-  const existing = new Set((await db.folders.toArray()).map((folder) => folder.id));
-  const pruned = ids.filter((id) => existing.has(id));
+  const folders = await db.folders.toArray();
+  const existing = new Set(folders.map((folder) => folder.id));
+  let pruned = ids.filter((id) => existing.has(id));
+
+  if (isSessionLocked()) {
+    const sealed = new Set(folders.filter(isSealed).map((folder) => folder.id));
+    pruned = pruned.filter((id) => !sealed.has(id));
+  }
+
   if (pruned.length !== ids.length) await setMeta(META_KEYS.recentFolders, pruned);
   return pruned;
+}
+
+// ---------------------------------------------------------------------------
+// Privacy preferences
+//
+// Stored in `meta`, which is exported with a backup: these are preferences, not
+// secrets. There is no passcode here and no verifier — knowing that re-lock is
+// set to five minutes tells an attacker nothing they cannot see on the lock
+// screen. The keyring lives in its own table and is never exported.
+// ---------------------------------------------------------------------------
+
+export async function getPrivacySettings(): Promise<PrivacySettings> {
+  const stored = await getMeta<Partial<PrivacySettings> | null>(META_KEYS.privacySettings, null);
+  if (!stored || typeof stored !== 'object') return { ...DEFAULT_PRIVACY_SETTINGS };
+
+  // Read field by field so a value written by a newer build cannot put the app
+  // into a shape it does not understand — and so a corrupted row degrades to the
+  // defaults rather than disabling the lock.
+  const policy: RelockPolicy = isRelockPolicy(stored.relockPolicy)
+    ? stored.relockPolicy
+    : DEFAULT_PRIVACY_SETTINGS.relockPolicy;
+
+  return {
+    enabled: stored.enabled === true,
+    relockPolicy: policy,
+    lockApp: stored.lockApp !== false,
+    secureScreen: stored.secureScreen === true,
+    biometric: stored.biometric !== false,
+  };
+}
+
+export async function setPrivacySettings(patch: Partial<PrivacySettings>): Promise<PrivacySettings> {
+  const current = await getPrivacySettings();
+  const next: PrivacySettings = { ...current, ...patch };
+  await setMeta(META_KEYS.privacySettings, next);
+  return next;
 }

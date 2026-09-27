@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import { AppBoot, BootGate, ShareListener } from '@/components/providers';
+import { AppBoot, BootGate, PrivacySession, ShareListener } from '@/components/providers';
 import { AppShell } from '@/components/app-shell';
 
 export const metadata: Metadata = {
@@ -46,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="antialiased">
         <AppBoot>
           <BootGate>
+            <PrivacySession />
             <ShareListener />
             <AppShell>{children}</AppShell>
           </BootGate>

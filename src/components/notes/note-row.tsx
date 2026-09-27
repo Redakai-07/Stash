@@ -1,11 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronRight, FileText, Link2, MoreHorizontal, Star } from 'lucide-react';
+import { ChevronRight, FileText, Link2, Lock, MoreHorizontal, Star } from 'lucide-react';
 import type { Note } from '@/db/types';
 import { checklistProgress } from '@/lib/markdown';
 import { formatRelative, pluralize } from '@/lib/format';
 import { notePlainText } from '@/lib/notes';
+import { useVaultStore } from '@/stores/vault-store';
 import { cn } from '@/lib/utils';
 
 /**
@@ -41,6 +42,7 @@ export function NoteRow({
   highlight = false,
   className,
 }: NoteRowProps) {
+  const locked = useVaultStore((state) => state.protection.notes.has(note.id));
   const checklist = React.useMemo(() => checklistProgress(note.content), [note.content]);
   const preview = React.useMemo(() => notePlainText(note.content, 80), [note.content]);
 
@@ -74,6 +76,9 @@ export function NoteRow({
             <span className="min-w-0 truncate text-[0.9375rem] leading-tight font-medium text-fg">
               {note.title}
             </span>
+            {locked ? (
+              <Lock size={12} strokeWidth={2.4} className="shrink-0 text-accent" aria-label="Locked note" />
+            ) : null}
             {note.isFavorite ? (
               <Star size={12} strokeWidth={2.4} className="shrink-0 fill-warning text-warning" aria-label="Favorite" />
             ) : null}

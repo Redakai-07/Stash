@@ -15,17 +15,26 @@ import {
   type MoveCheck,
 } from '@/lib/tree';
 import { contentFromLink, deriveNoteTitle, sanitizeNoteTitle, titleFromLink } from '@/lib/notes';
+import { getVaultKey } from '@/lib/privacy/keyring';
+import { isNoteParentProtected } from '@/lib/privacy/context';
+import { isSealed, openNote, sealNote } from '@/lib/privacy/protection';
+import { reconcileProtection } from '@/lib/privacy/reconcile';
 
 /**
  * Note persistence.
  *
- * Two invariants are enforced here rather than trusted to the UI:
+ * Three invariants are enforced here rather than trusted to the UI:
+ *
  *
  *  1. Deleting a note never deletes a saved link. Note deletion removes note
  *     rows and the references that point at links; the links themselves are not
  *     in the transaction's blast radius.
  *  2. A note can never be its own ancestor. Moves are validated against the
  *     same pure rules the UI uses to grey out impossible destinations.
+ *  3. Sealing is a storage concern. Every function here accepts and returns
+ *     *plaintext* notes; a locked note is sealed on the way into IndexedDB and
+ *     opened on the way out. Callers never see a ciphertext blob, and a locked
+ *     note's title never exists in the database at rest.
  */
 
 export interface CreateNoteInput {
@@ -73,17 +82,19 @@ export function buildNoteRecord(input: CreateNoteInput, siblings: readonly Note[
 }
 
 export async function createNote(input: CreateNoteInput): Promise<CreateNoteResult> {
-  return db.transaction('rw', db.notes, async () => {
-    const notes = await db.notes.toArray();
-    const parentNoteId = input.parentNoteId ?? null;
-    if (parentNoteId && !notes.some((note) => note.id === parentNoteId)) {
-      return { ok: false, reason: 'invalid', message: 'The parent note no longer exists.' } as const;
-    }
+  const parentNoteId = input.parentNoteId ?? null;
+  const parentProtected = await isNoteParentProtected(parentNoteId);
 
-    const note = buildNoteRecord(input, notes);
-    await db.notes.add(note);
-    return { ok: true, note } as const;
-  });
+  const notes = await db.notes.toArray();
+  if (parentNoteId && !notes.some((note) => note.id === parentNoteId)) {
+    return { ok: false, reason: 'invalid', message: 'The parent note no longer exists.' };
+  }
+
+  const note = buildNoteRecord(input, notes);
+  // A subnote of a locked note is born sealed, so there is no instant at which
+  // its title exists in the clear.
+  await db.notes.add(parentProtected ? await sealNote(note, getVaultKey()) : note);
+  return { ok: true, note };
 }
 
 export interface UpdateNoteInput {
@@ -92,20 +103,28 @@ export interface UpdateNoteInput {
 }
 
 export async function updateNote(id: string, patch: UpdateNoteInput): Promise<Note | null> {
-  return db.transaction('rw', db.notes, async () => {
-    const note = await db.notes.get(id);
-    if (!note) return null;
+  const raw = await db.notes.get(id);
+  if (!raw) return null;
 
-    const updated: Note = { ...note, updatedAt: Date.now() };
-    if (patch.title !== undefined) {
-      const title = sanitizeNoteTitle(patch.title);
-      updated.title = title.length > 0 ? title : deriveNoteTitle(updated.content);
-    }
-    if (patch.content !== undefined) updated.content = patch.content;
+  // Work on the plaintext view, then decide how to store the result. A sealed
+  // row stays sealed: an edit to a locked note must not leave the new text in
+  // the clear, and must not blank the fields the user just typed.
+  //
+  // Deliberately not a Dexie transaction: awaiting WebCrypto inside one makes
+  // Dexie consider the transaction over and the write is lost. Writes on a note
+  // are serialised upstream anyway — the autosave controller keeps a single
+  // write in flight — so the read-modify-write here has no interleaving writer
+  // to race with.
+  const note = await openNote(raw, getVaultKey());
+  const updated: Note = { ...note, updatedAt: Date.now() };
+  if (patch.title !== undefined) {
+    const title = sanitizeNoteTitle(patch.title);
+    updated.title = title.length > 0 ? title : deriveNoteTitle(updated.content);
+  }
+  if (patch.content !== undefined) updated.content = patch.content;
 
-    await db.notes.put(updated);
-    return updated;
-  });
+  await db.notes.put(isSealed(raw) ? await sealNote(updated, getVaultKey()) : updated);
+  return updated;
 }
 
 /**
@@ -116,9 +135,19 @@ export async function updateNote(id: string, patch: UpdateNoteInput): Promise<No
  * tree, and an interrupted save can only ever lose the last few keystrokes.
  */
 export async function saveNoteContent(id: string, content: string): Promise<number | null> {
-  const note = await db.notes.get(id);
-  if (!note) return null;
+  const raw = await db.notes.get(id);
+  if (!raw) return null;
   const updatedAt = Date.now();
+
+  // The autosave path. Typing must not be able to leak: for a locked note the
+  // whole note is re-sealed, which is cheap (one AES-GCM operation on a note-sized
+  // payload) and keeps the invariant "a locked note is never plaintext on disk".
+  if (isSealed(raw)) {
+    const note = await openNote(raw, getVaultKey());
+    await db.notes.put(await sealNote({ ...note, content, updatedAt }, getVaultKey()));
+    return updatedAt;
+  }
+
   // `modify` avoids a read-modify-write race with a concurrent structural change.
   await db.notes.update(id, { content, updatedAt });
   return updatedAt;
@@ -137,7 +166,7 @@ export async function canMoveNoteTo(id: string, targetParentNoteId: string | nul
 }
 
 export async function moveNote(id: string, targetParentNoteId: string | null): Promise<MoveNoteResult> {
-  return db.transaction('rw', db.notes, async () => {
+  const result = await db.transaction('rw', db.notes, async () => {
     const notes = await db.notes.toArray();
     const note = notes.find((candidate) => candidate.id === id);
     if (!note) return { ok: false, reason: 'That note no longer exists.' } as const;
@@ -154,6 +183,11 @@ export async function moveNote(id: string, targetParentNoteId: string | null): P
     await db.notes.put(updated);
     return { ok: true, note: updated } as const;
   });
+
+  // A move can cross a lock boundary in either direction: out of a locked parent
+  // the note must be opened again, into one it must be sealed.
+  if (result.ok) await reconcileProtection();
+  return result;
 }
 
 /** Shift a note one slot up or down among its siblings. */
@@ -195,11 +229,39 @@ export async function setNoteArchived(id: string, isArchived: boolean): Promise<
 }
 
 /**
- * Locking is persisted but not yet enforced: Phase 1 committed to the schema so
- * enabling it later never requires a migration.
+ * Lock or unlock one note.
+ *
+ * Only the flag is written here. Sealing the note (and its subnotes, which
+ * inherit the lock) is done by {@link reconcileProtection}, which derives what
+ * should be sealed from the flags and brings the database into line. Keeping the
+ * flag and the sealing derived from one another is what makes inheritance
+ * correct for free.
+ *
+ * Unlocking a note whose parent is still locked leaves it protected: the parent
+ * wins, and reconciliation re-seals it. The UI says so rather than offering an
+ * unlock that silently does nothing.
  */
 export async function setNoteLocked(id: string, isLocked: boolean): Promise<void> {
   await db.notes.update(id, { isLocked, updatedAt: Date.now() });
+  // Immediate, not deferred to the caller: the moment the flag changes, the
+  // database and the flag must agree about what is encrypted.
+  await reconcileProtection();
+}
+
+/**
+ * Whether clearing this note's flag would actually release it.
+ *
+ *
+ * A note beneath a locked parent cannot be unlocked on its own, and the sheet
+ * needs to be able to explain that before the user taps anything.
+ */
+export async function isLockInherited(id: string): Promise<boolean> {
+  const notes = await db.notes.toArray();
+  const note = notes.find((candidate) => candidate.id === id);
+  if (!note || note.isLocked) return false;
+  const parentId = note.parentNoteId;
+  if (!parentId) return false;
+  return isNoteParentProtected(parentId);
 }
 
 // ---------------------------------------------------------------------------
@@ -242,7 +304,7 @@ export function groupLinksByNote(noteLinks: readonly NoteLink[]): Map<string, st
  * removed notes are cleaned up.
  */
 export async function deleteNote(id: string, strategy: NoteDeleteStrategy): Promise<DeleteNoteResult> {
-  return db.transaction('rw', db.notes, db.noteLinks, async () => {
+  const result = await db.transaction('rw', db.notes, db.noteLinks, async () => {
     const notes = await db.notes.toArray();
     const note = notes.find((candidate) => candidate.id === id);
     if (!note) {
@@ -292,6 +354,12 @@ export async function deleteNote(id: string, strategy: NoteDeleteStrategy): Prom
       removedReferenceCount: references.filter((reference) => reference.noteId === id).length,
     };
   });
+
+  // `keep-children` promotes subnotes to the deleted note's parent, which may
+  // mean they leave a locked region and must be opened again. Reconciling after
+  // the transaction commits keeps the two consistent without a second code path.
+  if (result.ok) await reconcileProtection();
+  return result;
 }
 
 // ---------------------------------------------------------------------------

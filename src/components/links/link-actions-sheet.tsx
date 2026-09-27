@@ -1,13 +1,27 @@
 'use client';
 
 import * as React from 'react';
-import { Archive, ArrowLeft, Check, Copy, ExternalLink, FilePlus2, FolderInput, NotebookPen, Star, Trash2 } from 'lucide-react';
+import {
+  Archive,
+  ArrowLeft,
+  Check,
+  Copy,
+  ExternalLink,
+  FilePlus2,
+  FolderInput,
+  Lock,
+  NotebookPen,
+  Star,
+  Trash2,
+  Unlock,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { Note, SavedLink } from '@/db/types';
 import { destinationLabel, INBOX_DESTINATION, folderDestination } from '@/lib/destination';
 import { displayUrl, formatShortDate } from '@/lib/format';
 import { useBackDismiss } from '@/hooks/use-back-dismiss';
 import { useVaultStore } from '@/stores/vault-store';
+import { usePrivacyStore } from '@/stores/privacy-store';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
@@ -51,6 +65,9 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
   const [mode, setMode] = React.useState<Mode>('actions');
   const [note, setNote] = React.useState(link?.userNote ?? '');
   const [busy, setBusy] = React.useState(false);
+  const keyringPresent = usePrivacyStore((state) => state.keyringPresent);
+  const protectedId = link?.id ?? '';
+  const isProtected = useVaultStore((state) => state.protection.links.has(protectedId));
 
   const close = React.useCallback(() => {
     setMode('actions');
@@ -318,6 +335,39 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
                 icon={<FolderInput size={18} strokeWidth={1.9} aria-hidden />}
                 label="Move to another folder"
                 onClick={() => setMode('move')}
+              />
+              <ActionRow
+                icon={
+                  link.isLocked ? (
+                    <Unlock size={18} strokeWidth={1.9} aria-hidden />
+                  ) : (
+                    <Lock size={18} strokeWidth={1.9} aria-hidden />
+                  )
+                }
+                label={
+                  isProtected && !link.isLocked
+                    ? 'Locked by its folder'
+                    : link.isLocked
+                      ? 'Unlock this link'
+                      : 'Lock this link'
+                }
+                onClick={() => {
+                  if (!keyringPresent) {
+                    toast('Set a Stash passcode first', { tone: 'danger' });
+                    close();
+                    router.push('/settings');
+                    return;
+                  }
+                  if (isProtected && !link.isLocked) {
+                    toast('This link is inside a locked folder, so it is already protected.');
+                    return;
+                  }
+                  const next = !link.isLocked;
+                  void useVaultStore.getState().toggleLinkLocked(link.id).then(() => {
+                    toast(next ? 'Locked — the address is now encrypted' : 'Unlocked', { tone: 'success' });
+                  });
+                  close();
+                }}
               />
               <ActionRow
                 icon={<Archive size={18} strokeWidth={1.9} aria-hidden />}

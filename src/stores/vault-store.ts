@@ -19,15 +19,14 @@ import {
   createFolder as createFolderRepo,
   deleteFolder as deleteFolderRepo,
   getDeletionImpact,
-  getFolderStats,
   moveFolder as moveFolderRepo,
   renameFolder as renameFolderRepo,
   reorderFolder as reorderFolderRepo,
   setFolderFavorite,
   setFolderIcon,
+  setFolderLocked,
   type CreateFolderResult,
   type DeleteStrategy,
-  type FolderStats,
   type MoveResult,
 } from '@/db/repos/folders';
 import {
@@ -38,6 +37,7 @@ import {
   moveLink as moveLinkRepo,
   setLinkFavorite,
   setLinkArchived,
+  setLinkLocked,
   touchLinkOpened,
   updateLink as updateLinkRepo,
   type CreateLinkInput,
@@ -67,6 +67,9 @@ import {
 } from '@/db/repos/notes';
 import { visibleNotes } from '@/lib/notes';
 import { noteBreadcrumb, noteChildren, noteDescendantIds } from '@/lib/tree';
+import { computeFolderStats, type FolderStats } from '@/lib/folder-stats';
+import { isSessionLocked } from '@/lib/privacy/keyring';
+import { computeProtection, hiddenIds, type HiddenIds, type Protection } from '@/lib/privacy/protection';
 
 /**
  * The in-memory mirror of the vault.
@@ -82,13 +85,18 @@ export type VaultStatus = 'booting' | 'ready' | 'error';
 export interface VaultState {
   status: VaultStatus;
   error?: string;
+  /**
+   * Hidden-while-locked items are already removed from every collection below.
+   * A component that renders `state.folders` cannot leak a locked folder, because
+   * a locked folder is not in `state.folders`.
+   */
   folders: Folder[];
   links: SavedLink[];
   tags: Tag[];
   linkTags: LinkTag[];
   folderStats: Map<string, FolderStats>;
   recentFolderIds: string[];
-  /** Every note, including archived ones. */
+  /** Every visible note, including archived ones. */
   notes: Note[];
   /**
    * Notes a browsing UI should show: archived notes and their subtrees removed.
@@ -97,6 +105,19 @@ export interface VaultState {
   visibleNotes: Note[];
   /** Note-to-link references, the join between the two halves of the vault. */
   noteLinks: NoteLink[];
+  /**
+   * Which ids are locked, in their own right or through an ancestor.
+   *
+   * Unlike the collections above this is *not* filtered: the UI needs it to show
+   * a lock badge on a subtree that inherited a lock, and to explain why an item
+   * cannot be unlocked on its own. It contains ids only — never content — and ids
+   * of locked items are useless without the key.
+   */
+  protection: Protection;
+  /** Whether the session is currently locked, i.e. the vault key is absent. */
+  sessionLocked: boolean;
+  /** Ids withheld from search and listings. Empty while unlocked. */
+  hidden: HiddenIds;
 
   initialize: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -108,6 +129,7 @@ export interface VaultState {
   deleteFolder: (id: string, strategy: DeleteStrategy) => Promise<boolean>;
   toggleFolderFavorite: (id: string, value?: boolean) => Promise<void>;
   setFolderEmojiIcon: (id: string, icon: string | undefined) => Promise<void>;
+  toggleFolderLocked: (id: string, value?: boolean) => Promise<void>;
   deletionImpact: (id: string) => Promise<FolderDeletionImpact | null>;
 
   saveLink: (input: CreateLinkInput) => Promise<SavedLink>;
@@ -115,6 +137,7 @@ export interface VaultState {
   moveLink: (id: string, folderId: string | null) => Promise<void>;
   toggleLinkFavorite: (id: string, value?: boolean) => Promise<void>;
   archiveLink: (id: string, value: boolean) => Promise<void>;
+  toggleLinkLocked: (id: string, value?: boolean) => Promise<void>;
   deleteLink: (id: string) => Promise<void>;
   markLinkOpened: (id: string) => Promise<void>;
   duplicatesFor: (url: string, excludeId?: string) => Promise<DuplicateMatch[]>;
@@ -138,23 +161,46 @@ export interface VaultState {
   createNoteFromLink: (linkId: string, parentNoteId?: string | null) => Promise<CreateNoteResult>;
 }
 
+/**
+ * Read the vault, then apply the lock filter once, centrally.
+ *
+ * This is the single place "what may be shown right now" is decided. Every
+ * screen, picker and count downstream reads the filtered collections, so a new
+ * surface inherits the lock rules instead of having to implement them. Counts and
+ * recents are derived from the *unfiltered* rows with the hidden sets applied, so
+ * a locked folder's contents are excluded from totals rather than merely
+ * unrendered.
+ */
 async function loadEverything() {
-  const [snapshot, folderStats, recentFolderIds] = await Promise.all([
-    getSnapshot(),
-    getFolderStats(),
-    pruneRecentFolders(),
-  ]);
+  const [snapshot, recentFolderIds] = await Promise.all([getSnapshot(), pruneRecentFolders()]);
   const tags = await listTags();
+
+  const protection = computeProtection(snapshot.folders, snapshot.notes, snapshot.links);
+  const sessionLocked = isSessionLocked();
+  const hidden = hiddenIds(protection, sessionLocked);
+
+  const folders = snapshot.folders.filter((folder) => !hidden.folders.has(folder.id));
+  const links = snapshot.links.filter((link) => !hidden.links.has(link.id));
+  const notes = snapshot.notes.filter((note) => !hidden.notes.has(note.id));
+
+  const folderStats = computeFolderStats(snapshot.folders, snapshot.links, {
+    hiddenFolderIds: hidden.folders,
+    hiddenLinkIds: hidden.links,
+  });
+
   return {
-    folders: snapshot.folders,
-    links: snapshot.links,
+    folders,
+    links,
     tags,
     linkTags: snapshot.linkTags,
     folderStats,
     recentFolderIds,
-    notes: snapshot.notes,
-    visibleNotes: visibleNotes(snapshot.notes),
+    notes,
+    visibleNotes: visibleNotes(notes),
     noteLinks: snapshot.noteLinks,
+    protection,
+    sessionLocked,
+    hidden,
   };
 }
 
@@ -169,6 +215,9 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   notes: [],
   visibleNotes: [],
   noteLinks: [],
+  protection: { folders: new Set(), notes: new Set(), links: new Set() },
+  sessionLocked: false,
+  hidden: { folders: new Set(), notes: new Set(), links: new Set() },
 
   initialize: async () => {
     if (get().status === 'ready') return;
@@ -245,6 +294,20 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     await get().refresh();
   },
 
+  /**
+   * Lock or unlock a folder and everything beneath it.
+   *
+   * Sealing the subtree happens in the repository, which re-derives it from the
+   * flags, so a subfolder or link that inherits this lock becomes ciphertext at
+   * rest without the store having to enumerate it.
+   */
+  toggleFolderLocked: async (id, value) => {
+    const current = get().folders.find((folder) => folder.id === id);
+    const next = value ?? !(current?.isLocked ?? false);
+    await setFolderLocked(id, next);
+    await get().refresh();
+  },
+
   deletionImpact: (id) => getDeletionImpact(id),
 
   saveLink: async (input) => {
@@ -283,6 +346,13 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   archiveLink: async (id, value) => {
     await setLinkArchived(id, value);
+    await get().refresh();
+  },
+
+  toggleLinkLocked: async (id, value) => {
+    const current = get().links.find((link) => link.id === id);
+    const next = value ?? !(current?.isLocked ?? false);
+    await setLinkLocked(id, next);
     await get().refresh();
   },
 

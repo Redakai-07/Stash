@@ -8,16 +8,20 @@ import {
   Check,
   FolderInput,
   FolderPlus,
+  Lock,
   Pencil,
   Star,
   Trash2,
+  Unlock,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import type { Folder } from '@/db/types';
 import { FOLDER_ICON_CHOICES, Icon } from '@/components/ui/icon';
 import { canMoveFolder, folderPathLabel, type MoveCheck } from '@/lib/tree';
 import { pluralize } from '@/lib/format';
 import { useBackDismiss } from '@/hooks/use-back-dismiss';
 import { useVaultStore } from '@/stores/vault-store';
+import { usePrivacyStore } from '@/stores/privacy-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
@@ -46,8 +50,12 @@ export interface FolderActionsSheetProps {
 }
 
 export function FolderActionsSheet({ folder, onClose, onDeleted }: FolderActionsSheetProps) {
+  const router = useRouter();
   const folders = useVaultStore((state) => state.folders);
   const links = useVaultStore((state) => state.links);
+  const keyringPresent = usePrivacyStore((state) => state.keyringPresent);
+  const protectedId = folder?.id ?? '';
+  const isProtected = useVaultStore((state) => state.protection.folders.has(protectedId));
   // Reset by remount: callers pass a `key` derived from the folder id.
   const [mode, setMode] = React.useState<Mode>('actions');
   const [name, setName] = React.useState(folder?.name ?? '');
@@ -311,6 +319,41 @@ export function FolderActionsSheet({ folder, onClose, onDeleted }: FolderActions
               />
               <ActionRow
                 icon={
+                  folder.isLocked ? (
+                    <Unlock size={18} strokeWidth={1.9} aria-hidden />
+                  ) : (
+                    <Lock size={18} strokeWidth={1.9} aria-hidden />
+                  )
+                }
+                label={
+                  // "Locked by a parent" is a real state, not an edge case: the
+                  // lock is inherited, so this folder cannot release itself.
+                  isProtected && !folder.isLocked
+                    ? 'Locked by a parent folder'
+                    : folder.isLocked
+                      ? 'Unlock this folder'
+                      : 'Lock this folder'
+                }
+                onClick={() => {
+                  if (!keyringPresent) {
+                    toast('Set a Stash passcode first', { tone: 'danger' });
+                    close();
+                    router.push('/settings');
+                    return;
+                  }
+                  if (isProtected && !folder.isLocked) {
+                    toast('A folder inside a locked folder inherits its lock. Unlock the parent instead.');
+                    return;
+                  }
+                  const next = !folder.isLocked;
+                  void useVaultStore.getState().toggleFolderLocked(folder.id).then(() => {
+                    toast(next ? 'Locked — encrypted at rest' : 'Unlocked', { tone: 'success' });
+                  });
+                  close();
+                }}
+              />
+              <ActionRow
+                icon={
                   <Star
                     size={18}
                     strokeWidth={1.9}
@@ -356,6 +399,11 @@ export function FolderActionsSheet({ folder, onClose, onDeleted }: FolderActions
                 onClick={() => setMode('delete')}
               />
               {!moveCheck.ok ? <p className="px-1 text-xs text-subtle">{moveCheck.reason}</p> : null}
+              {!keyringPresent ? (
+                <p className="px-1 text-xs leading-relaxed text-subtle">
+                  Locking encrypts a folder and everything inside it. Set a passcode in Settings to turn it on.
+                </p>
+              ) : null}
             </div>
           )}
         </SheetBody>

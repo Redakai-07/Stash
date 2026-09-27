@@ -1,9 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronRight, MoreHorizontal, Star } from 'lucide-react';
+import { ChevronRight, Lock, MoreHorizontal, Star } from 'lucide-react';
 import type { Folder } from '@/db/types';
 import { pluralize } from '@/lib/format';
+import { useVaultStore } from '@/stores/vault-store';
 import { cn } from '@/lib/utils';
 import { Icon, isIconName } from '@/components/ui/icon';
 
@@ -28,6 +29,7 @@ export function FolderRow({
   onShowActions,
   className,
 }: FolderRowProps) {
+  const locked = useVaultStore((state) => state.protection.folders.has(folder.id));
   const meta: string[] = [];
   if (linkCount > 0) meta.push(pluralize(linkCount, 'link'));
   if (childCount > 0) meta.push(pluralize(childCount, 'folder'));
@@ -51,6 +53,9 @@ export function FolderRow({
             <span className="min-w-0 truncate text-[0.9375rem] leading-tight font-medium text-fg">
               {folder.name}
             </span>
+            {locked ? (
+              <Lock size={12} strokeWidth={2.4} className="shrink-0 text-accent" aria-label="Locked folder" />
+            ) : null}
             {folder.isFavorite ? (
               <Star size={12} strokeWidth={2.4} className="shrink-0 text-warning" aria-label="Favorite folder" />
             ) : null}
