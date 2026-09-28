@@ -15,7 +15,16 @@ import { hiddenIds, type HiddenIds, type Protection } from '@/lib/privacy/protec
  * the list harder to read, not easier.
  */
 
-export type SearchFilter = 'all' | 'links' | 'notes' | 'favorites' | 'recent';
+/**
+ * The vault filters.
+ *
+ * `archived` is the only filter that *widens* rather than narrows: archived
+ * items are hidden from every other filter, and this is the one deliberate way
+ * to see them. Burying them behind a filter rather than a separate screen keeps
+ * "where did that go?" answerable by the same search box that answers everything
+ * else — one place to look, always.
+ */
+export type SearchFilter = 'all' | 'links' | 'notes' | 'favorites' | 'recent' | 'archived';
 
 export const SEARCH_FILTERS: ReadonlyArray<{ id: SearchFilter; label: string }> = [
   { id: 'all', label: 'All' },
@@ -23,6 +32,7 @@ export const SEARCH_FILTERS: ReadonlyArray<{ id: SearchFilter; label: string }> 
   { id: 'notes', label: 'Notes' },
   { id: 'favorites', label: 'Favorites' },
   { id: 'recent', label: 'Recent' },
+  { id: 'archived', label: 'Archived' },
 ];
 
 export interface VaultSnapshot {
@@ -271,6 +281,10 @@ function passesLinkFilter(link: SavedLink, filter: SearchFilter, hidden: HiddenI
   // result under any filter, including an empty query, a favourites filter or a
   // recency listing. There is no filter combination that reveals it.
   if (hidden.links.has(link.id)) return false;
+  // Archiving is a separate axis from the other filters, so it is decided before
+  // them: the Archived filter shows archived items and nothing else, and every
+  // other filter shows live items only.
+  if (filter === 'archived') return link.isArchived;
   if (link.isArchived) return false;
   switch (filter) {
     case 'favorites':
@@ -290,6 +304,7 @@ function passesNoteFilter(note: Note, filter: SearchFilter, hidden: HiddenIds): 
   // A locked note contributes neither its title nor its path nor its body to
   // search. `prepareNotes` never even reaches it.
   if (hidden.notes.has(note.id)) return false;
+  if (filter === 'archived') return note.isArchived;
   if (note.isArchived) return false;
   switch (filter) {
     case 'favorites':
@@ -361,14 +376,19 @@ export function searchVault(snapshot: VaultSnapshot, options: SearchOptions): Se
         matched: [] as string[],
       }));
 
-    const folders = includeFolders
-      ? snapshot.folders
-          .filter((folder) => !hidden.folders.has(folder.id))
-          .slice()
-          .sort((a, b) => b.updatedAt - a.updatedAt)
-          .slice(0, folderLimit)
-          .map((folder) => ({ folder, score: 0, path: folderPathLabel(snapshot.folders, folder.id) }))
-      : [];
+    // Folders have no archived state, so under the Archived filter the folder
+    // group is empty rather than misleadingly full. Favorites narrows folders to
+    // the starred ones, which is what makes "all my favorites" one list.
+    const folders =
+      includeFolders && filter !== 'archived'
+        ? snapshot.folders
+            .filter((folder) => !hidden.folders.has(folder.id))
+            .filter((folder) => (filter === 'favorites' ? folder.isFavorite : true))
+            .slice()
+            .sort((a, b) => b.updatedAt - a.updatedAt)
+            .slice(0, folderLimit)
+            .map((folder) => ({ folder, score: 0, path: folderPathLabel(snapshot.folders, folder.id) }))
+        : [];
 
     return { links, folders, notes, relaxed: false };
   }
@@ -408,9 +428,10 @@ export function searchVault(snapshot: VaultSnapshot, options: SearchOptions): Se
     }
 
     const folders: FolderHit[] = [];
-    if (includeFolders) {
+    if (includeFolders && filter !== 'archived') {
       for (const folder of snapshot.folders) {
         if (hidden.folders.has(folder.id)) continue;
+        if (filter === 'favorites' && !folder.isFavorite) continue;
         const path = pathCache.get(folder.id) ?? folderPathLabel(snapshot.folders, folder.id);
         const entry = {
           folder,

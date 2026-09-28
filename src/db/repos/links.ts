@@ -223,12 +223,47 @@ export async function setLinkLocked(id: string, isLocked: boolean): Promise<void
 }
 
 /**
- * Delete a saved link.
+ * Record that the address no longer works, or that it does again.
  *
- * Notes that referenced it are not touched -- they simply stop referencing it.
- * Deleting a link must never delete the thinking that pointed at it.
+ * Set only by the user. Stash has no background checker and should not have one:
+ * it cannot open a page on the user's behalf, it would need the network that the
+ * rest of the app is proud not to need, and a periodic scan of someone's saved
+ * links is a privacy cost paid for a guess. What the app *can* do is make it easy
+ * to note the truth once, and then find the link again — which is what this does.
+ *
+ * The address itself is untouched either way. `url` is the record of what you
+ * meant to keep; a dead page does not change that.
  */
-export async function deleteLink(id: string): Promise<void> {
+export async function setLinkUnavailable(id: string, isUnavailable: boolean): Promise<void> {
+  const now = Date.now();
+  if (isUnavailable) {
+    await db.links.update(id, { isUnavailable: true, unavailableAt: now, updatedAt: now });
+    return;
+  }
+
+  // Marked working again: the timestamp is removed outright rather than set to
+  // undefined, so the stored row says "never unavailable" instead of holding a
+  // field that means two things.
+  const row = await db.links.get(id);
+  if (!row) return;
+  const next: SavedLink = { ...row, isUnavailable: false, updatedAt: now };
+  delete next.unavailableAt;
+  await db.links.put(next);
+}
+
+/**
+ * Remove a link for good, along with the references from notes.
+ *
+ * Notes that referenced it are not touched — they simply stop referencing it.
+ * Deleting a link must never delete the thinking that pointed at it.
+ *
+ * Named for what it is because the ordinary delete is a move to the trash
+ * (`trashLink`), and the two are not interchangeable. The only caller is the
+ * undo on a link the user just saved: discarding something created seconds ago is
+ * not the same act as changing your mind about something you kept, and sending it
+ * to the trash would litter a recovery surface with rows nobody meant to keep.
+ */
+export async function deleteLinkPermanently(id: string): Promise<void> {
   await db.transaction('rw', db.links, db.noteLinks, async () => {
     await db.noteLinks.where('linkId').equals(id).delete();
     await db.links.delete(id);

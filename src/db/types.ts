@@ -26,7 +26,34 @@ export interface EncryptedPayload {
   ct: string;
 }
 
-export interface Folder {
+/**
+ * Fields every row that can be thrown away carries.
+ *
+ * Deleting is a two-step thing in Stash, and the data model says so rather than
+ * hiding it behind a separate "trash" table:
+ *
+ *  - `deletedAt` marks a row as thrown away. It is *still a real row* — with its
+ *    id, its place in the hierarchy and its content — which is what makes
+ *    restoring it exact rather than approximate. Absent means live, so rows
+ *    written before the trash existed are live by definition and nothing had to
+ *    be rewritten to introduce it.
+ *  - `trashBatch` records what was thrown away *together*. Deleting a folder is
+ *    one act, so the folder and everything beneath it share a batch and come
+ *    back as one thing. A single link is a batch of one.
+ *
+ * The alternative — moving rows into a `trash` table — would mean either
+ * duplicating the hierarchy or flattening it, and every reference pointing into
+ * the trash would have to be rewritten and un-rewritten. Two columns on the row
+ * itself keep a deleted folder a folder.
+ */
+export interface Trashable {
+  /** Epoch ms when the row was thrown away. Absent means it is live. */
+  deletedAt?: number;
+  /** Rows thrown away in the same act share this id, so they return together. */
+  trashBatch?: string;
+}
+
+export interface Folder extends Trashable {
   id: string;
   /** Null means a top-level folder. */
   parentId: string | null;
@@ -47,11 +74,16 @@ export interface Folder {
   enc?: EncryptedPayload;
 }
 
-export interface SavedLink {
+export interface SavedLink extends Trashable {
   id: string;
   /** Null means the link lives in the Inbox rather than a user folder. */
   folderId: string | null;
-  /** The URL exactly as it was captured. Never rewritten. */
+  /**
+   * The URL exactly as it was captured. Never rewritten, never normalized in
+   * place, and kept even when the address stops working: the record of what you
+   * meant to keep is the whole point of the row. `normalizedUrl` exists only to
+   * catch duplicates and never replaces this.
+   */
   url: string;
   /**
    * Conservative canonical form used only for duplicate detection.
@@ -72,6 +104,16 @@ export interface SavedLink {
   lastOpenedAt?: number;
   isFavorite: boolean;
   isArchived: boolean;
+  /**
+   * Marked by the user as no longer reachable.
+   *
+   * Set by hand, never by a background check: Stash does not poll the network,
+   * so it cannot know on its own that a page died, and pretending otherwise
+   * would be a guess presented as a fact. The link stays where it is and stays
+   * findable — a dead link is still the thing you remembered.
+   */
+  isUnavailable?: boolean;
+  unavailableAt?: number;
   /** Locked against viewing until the session is unlocked. */
   isLocked: boolean;
   /**
@@ -96,7 +138,7 @@ export interface Tag {
  * predictable no matter how deep the tree goes, and moving a subtree is a
  * single field update instead of rewriting a nested document.
  */
-export interface Note {
+export interface Note extends Trashable {
   id: string;
   /** Null means a top-level note. */
   parentNoteId: string | null;
@@ -263,9 +305,15 @@ export interface ExportedKeyring {
  * against at runtime; typing it honestly means the default-to-unlocked decision
  * is made in one place, visibly, in `normalize*`.
  */
-export type IncomingFolder = Omit<Folder, 'isLocked'> & { isLocked?: boolean };
-export type IncomingNote = Omit<Note, 'isLocked'> & { isLocked?: boolean };
-export type IncomingLink = Omit<SavedLink, 'isLocked'> & { isLocked?: boolean };
+export interface IncomingFolder extends Omit<Folder, 'isLocked'> {
+  isLocked?: boolean;
+}
+export interface IncomingNote extends Omit<Note, 'isLocked'> {
+  isLocked?: boolean;
+}
+export interface IncomingLink extends Omit<SavedLink, 'isLocked'> {
+  isLocked?: boolean;
+}
 
 export interface ExportBundle {
   format: 'stash-export';
@@ -290,6 +338,38 @@ export interface ExportBundle {
    * device that created it.
    */
   security?: { keyring?: ExportedKeyring };
+}
+
+/**
+ * One thing in the trash.
+ *
+ * A batch is the unit the user thinks in — "the folder I deleted", "that link" —
+ * so it is also the unit the UI lists, restores and purges. The counts describe
+ * what else came along with the root row.
+ */
+export interface TrashEntry {
+  batch: string;
+  /** What the batch was made of when it was thrown away. */
+  kind: 'folder' | 'link' | 'note';
+  /** The row the user actually deleted. */
+  rootId: string;
+  /** Its name or title as it was at the time. */
+  label: string;
+  deletedAt: number;
+  folderCount: number;
+  linkCount: number;
+  noteCount: number;
+  /** Where the root sat, so the trash entry can say where it came from. */
+  path: string;
+}
+
+/** What a trash operation actually touched. */
+export interface TrashImpact {
+  folders: number;
+  links: number;
+  notes: number;
+  /** Rows that had to be re-homed because their parent was gone for good. */
+  rehomed: number;
 }
 
 /** A note plus the counts needed to describe the cost of deleting it. */

@@ -9,9 +9,12 @@ import {
   ExternalLink,
   FilePlus2,
   FolderInput,
+  Link2Off,
   Lock,
   NotebookPen,
+  Share2,
   Star,
+  Tag as TagIcon,
   Trash2,
   Unlock,
 } from 'lucide-react';
@@ -19,6 +22,9 @@ import { useRouter } from 'next/navigation';
 import type { Note, SavedLink } from '@/db/types';
 import { destinationLabel, INBOX_DESTINATION, folderDestination } from '@/lib/destination';
 import { displayUrl, formatShortDate } from '@/lib/format';
+import { shareOut } from '@/lib/share/share-out';
+import { selectTagsForLink } from '@/stores/vault-store';
+import { LinkTagsEditor } from './link-tags-editor';
 import { useBackDismiss } from '@/hooks/use-back-dismiss';
 import { useVaultStore } from '@/stores/vault-store';
 import { usePrivacyStore } from '@/stores/privacy-store';
@@ -37,7 +43,7 @@ import { NotePicker } from '@/components/notes/note-picker';
  * this go" behaves identically whether you are saving or reorganising later.
  */
 
-type Mode = 'actions' | 'move' | 'confirm-delete' | 'attach-note';
+type Mode = 'actions' | 'move' | 'confirm-delete' | 'attach-note' | 'tags';
 
 export interface LinkActionsSheetProps {
   link: SavedLink | null;
@@ -68,6 +74,7 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
   const keyringPresent = usePrivacyStore((state) => state.keyringPresent);
   const protectedId = link?.id ?? '';
   const isProtected = useVaultStore((state) => state.protection.links.has(protectedId));
+  const tagNames = useVaultStore((state) => selectTagsForLink(state, protectedId));
 
   const close = React.useCallback(() => {
     setMode('actions');
@@ -93,6 +100,24 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
     } catch {
       toast('Could not copy the link', { tone: 'danger' });
     }
+  };
+
+  /**
+   * Hand the address to another app.
+   *
+   * The same act as a capture, in reverse, and it goes through the same seam:
+   * Android's chooser. When there is nothing to hand it to, or the platform has
+   * no share sheet, the address is copied instead and said so — a share that
+   * silently did nothing would be worse than no button.
+   */
+  const shareLink = async () => {
+    const outcome = await shareOut({
+      text: link.url,
+      ...(link.title?.trim() ? { subject: link.title.trim() } : {}),
+      title: link.title?.trim() || displayUrl(link.url, 40),
+    });
+    if (outcome === 'copied') toast('No share sheet here — address copied', { tone: 'success' });
+    else if (outcome === 'failed') toast('Could not share that', { tone: 'danger' });
   };
 
   const saveNote = async () => {
@@ -136,25 +161,21 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
     router.push(`/notes?note=${result.note.id}`);
   };
 
+  /**
+   * Deleting is a move to the trash, so the confirmation above is the only
+   * warning that is needed and the undo is a real restore rather than a re-save.
+   * The action opens the trash rather than restoring inline: a restore needs the
+   * whole batch to be meaningful, and that is where it lives.
+   */
   const remove = async () => {
     setBusy(true);
-    const removed = link;
     await useVaultStore.getState().deleteLink(link.id);
     setBusy(false);
-    toast('Link deleted', {
+    toast('Moved to trash', {
+      description: 'You can restore it from Settings → Trash.',
       action: {
-        label: 'Undo',
-        onSelect: () => {
-          void useVaultStore.getState().saveLink({
-            url: removed.url,
-            folderId: removed.folderId,
-            title: removed.title,
-            userNote: removed.userNote,
-            source: removed.source,
-            rawText: removed.rawText,
-            isFavorite: removed.isFavorite,
-          });
-        },
+        label: 'Open trash',
+        onSelect: () => router.push('/trash'),
       },
       duration: 6000,
     });
@@ -186,7 +207,9 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
                     ? 'Delete link?'
                     : mode === 'attach-note'
                       ? 'Attach to a note'
-                      : link.title?.trim() || displayUrl(link.url, 40)}
+                      : mode === 'tags'
+                        ? 'Tags'
+                        : link.title?.trim() || displayUrl(link.url, 40)}
               </SheetTitle>
               <p className="mt-0.5 truncate text-xs text-subtle">
                 {mode === 'move' ? currentFolder : `${link.source ?? ''} · ${formatShortDate(link.createdAt)}`}
@@ -213,13 +236,17 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
               }}
               filterPlaceholder="Find a note"
             />
+          ) : mode === 'tags' ? (
+            <div className="px-3 pb-2">
+              <LinkTagsEditor key={link.id} linkId={link.id} />
+            </div>
           ) : mode === 'confirm-delete' ? (
             <div className="px-3 pb-2">
               <div className="rounded-xl border border-danger/30 bg-danger-soft p-3.5">
                 <p className="text-[0.9375rem] font-semibold text-danger">This removes the link permanently</p>
                 <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-fg/80">
-                  “{link.title?.trim() || displayUrl(link.url, 40)}” and its note will be removed from your
-                  vault. There is no trash for links yet, so this cannot be recovered after closing Stash.
+                  “{link.title?.trim() || displayUrl(link.url, 40)}” moves to the trash. Its note and the notes
+                  that reference it are left alone, and you can restore it from Settings → Trash.
                 </p>
                 <div className="mt-3.5 flex gap-2">
                   <Button variant="surface" className="flex-1" onClick={() => setMode('actions')} disabled={busy}>
@@ -307,6 +334,18 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
                 onClick={() => void copyLink()}
               />
               <ActionRow
+                icon={<Share2 size={18} strokeWidth={1.9} aria-hidden />}
+                label="Share link"
+                onClick={() => void shareLink()}
+              />
+              <ActionRow
+                icon={
+                  <TagIcon size={18} strokeWidth={1.9} aria-hidden />
+                }
+                label={tagNames.length > 0 ? `Tags · ${tagNames.join(', ')}` : 'Add tags'}
+                onClick={() => setMode('tags')}
+              />
+              <ActionRow
                 icon={
                   <Star
                     size={18}
@@ -369,6 +408,25 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
                   close();
                 }}
               />
+              {/*
+                Link health is recorded, never checked. Stash has no background
+                checker and should not have one: it would need the network the
+                rest of the app does not need, and a periodic scan of someone's
+                saved links is a real privacy cost paid for a guess. What it can
+                do is let the user note the truth once — and find it again.
+              */}
+              <ActionRow
+                icon={<Link2Off size={18} strokeWidth={1.9} aria-hidden />}
+                label={link.isUnavailable ? 'This link works again' : 'Mark as no longer working'}
+                onClick={() => {
+                  const next = !link.isUnavailable;
+                  void useVaultStore
+                    .getState()
+                    .setLinkUnavailable(link.id, next)
+                    .then(() => toast(next ? 'Marked as unavailable' : 'Marked as working'));
+                  close();
+                }}
+              />
               <ActionRow
                 icon={<Archive size={18} strokeWidth={1.9} aria-hidden />}
                 label={link.isArchived ? 'Restore from archive' : 'Archive link'}
@@ -400,6 +458,12 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
             <Button variant="accentSoft" className="w-full" onClick={() => void createNote()} disabled={busy}>
               <FilePlus2 size={17} strokeWidth={2} aria-hidden />
               New note from this link
+            </Button>
+          </SheetFooter>
+        ) : mode === 'tags' ? (
+          <SheetFooter>
+            <Button variant="surface" className="w-full" onClick={close}>
+              Done
             </Button>
           </SheetFooter>
         ) : null}

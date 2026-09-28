@@ -340,8 +340,8 @@ function NotesView() {
         <div className="px-4">
           <EmptyState
             icon={<NotebookPen size={22} strokeWidth={1.7} />}
-            title="Your own thinking, next to your links"
-            description="Write a note for anything you want to remember and break it into subnotes as it grows. Notes live on this device with everything else."
+            title="Start with a thought."
+            description="A note is your own words next to the things you saved. Write one line now and break it into subnotes as it grows — nothing here needs a title, a folder or a network."
             action={
               <Button variant="accentSoft" size="sm" onClick={() => void createNote(null)}>
                 <FilePlus2 size={16} strokeWidth={2} aria-hidden />

@@ -8,6 +8,15 @@ import { parseShare, type IncomingShare, type RawShareInput } from './parse';
  * same capture flow works for a native share, a PWA share target, and a URL
  * opened during development.
  */
+/** What Stash hands to another app. */
+export interface SharePayload {
+  text: string;
+  /** Chooser heading. */
+  title?: string;
+  /** `EXTRA_SUBJECT`, used as the subject line by mail clients. */
+  subject?: string;
+}
+
 export interface ShareBridge {
   readonly kind: 'capacitor' | 'web';
   /** Whether this bridge can ever deliver a share on the current platform. */
@@ -18,6 +27,12 @@ export interface ShareBridge {
   clearPendingShare(): Promise<void>;
   /** Shares that arrive while the app is already running. Returns an unsubscribe. */
   subscribe(listener: (share: IncomingShare) => void): () => void;
+  /**
+   * Hand content to the platform's share sheet. Resolves `false` when this
+   * platform cannot, which is the signal for the caller to fall back to the
+   * clipboard rather than a failure to report.
+   */
+  share(payload: SharePayload): Promise<boolean>;
 }
 
 /** Shape returned by the native Android plugin. */
@@ -34,7 +49,31 @@ const EMPTY_BRIDGE: ShareBridge = {
   getPendingShare: async () => null,
   clearPendingShare: async () => undefined,
   subscribe: () => () => undefined,
+  share: async () => false,
 };
+
+/**
+ * The Web Share API, when the browser has it.
+ *
+ * Kept separate from the incoming-share bridge because the two are genuinely
+ * different capabilities: a browser can be able to send shares and unable to
+ * receive them, which is the normal case for the installable PWA.
+ */
+async function shareViaWebApi(payload: SharePayload): Promise<boolean> {
+  if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') return false;
+  try {
+    await navigator.share({
+      text: payload.text,
+      ...(payload.title ? { title: payload.title } : {}),
+    });
+    return true;
+  } catch {
+    // `AbortError` means the user dismissed the sheet, which is a decision, not
+    // a failure — either way the clipboard fallback is the wrong answer here, so
+    // this reports "handled" and the caller stops.
+    return true;
+  }
+}
 
 /**
  * Bridges that are only meaningful in specific environments are registered
@@ -70,6 +109,7 @@ export function createWebShareBridge(search = typeof window === 'undefined' ? ''
       }
     },
     subscribe: () => () => undefined,
+    share: (payload) => shareViaWebApi(payload),
   };
 }
 
@@ -96,6 +136,8 @@ export async function getShareBridge(): Promise<ShareBridge> {
 export interface NativeShareApi {
   getPendingShare(): Promise<{ share: NativeSharePayload | null }>;
   clearPendingShare(): Promise<void>;
+  /** Opens Android's chooser. Rejects when no target can receive the content. */
+  shareOut(payload: SharePayload): Promise<void>;
   addListener(
     eventName: 'shareReceived',
     listener: (payload: NativeSharePayload) => void,
@@ -126,6 +168,18 @@ export function createCapacitorShareBridge(core: {
         await plugin.clearPendingShare();
       } catch (error) {
         console.warn('[stash] could not clear pending share', error);
+      }
+    },
+    share: async (payload) => {
+      try {
+        await plugin.shareOut(payload);
+        return true;
+      } catch (error) {
+        // A build whose native side predates `shareOut` lands here, as does a
+        // device with nothing to share to. Either way the caller's clipboard
+        // fallback is the better answer than an error message.
+        console.warn('[stash] native share unavailable', error);
+        return false;
       }
     },
     subscribe: (listener) => {

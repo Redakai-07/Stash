@@ -145,7 +145,11 @@ export function NoteActionsSheet({ note, onClose, onOpenNote, onDeleted }: NoteA
       toast('Could not delete that note', { tone: 'danger' });
       return;
     }
-    toast(strategy === 'keep-children' ? 'Note removed, subnotes kept' : 'Note and subnotes deleted');
+    toast(strategy === 'keep-children' ? 'Note removed, subnotes kept' : 'Moved to trash', {
+      ...(strategy === 'keep-children'
+        ? { tone: 'success' as const }
+        : { description: 'The note and its subnotes come back together from Settings → Trash.' }),
+    });
     onDeleted?.(note.id);
     close();
   };
@@ -254,7 +258,7 @@ export function NoteActionsSheet({ note, onClose, onOpenNote, onDeleted }: NoteA
                 <span className="text-[0.9375rem] font-semibold text-danger">Delete this note and everything inside</span>
                 <span className="text-[0.8125rem] leading-relaxed text-fg/80">
                   {descendantCount > 0
-                    ? `${pluralize(descendantCount, 'note')} are removed permanently.`
+                    ? `${pluralize(descendantCount, 'note')} go to the trash with it and come back together.`
                     : 'No subnotes to remove.'}
                 </span>
               </button>

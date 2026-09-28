@@ -20,7 +20,9 @@ import {
   saveNoteContent,
   updateNote,
 } from '@/db/repos/notes';
-import { createLink, deleteLink, getLink, listAllLinks } from '@/db/repos/links';
+import { createLink, deleteLinkPermanently, getLink, listAllLinks } from '@/db/repos/links';
+import { getSnapshot } from '@/db/repos/vault';
+import { countTrashed, listTrashGroups, purgeBatch, restoreBatch } from '@/db/repos/trash';
 
 /**
  * Notes persistence tests.
@@ -174,27 +176,46 @@ describe('move', () => {
 });
 
 describe('deletion', () => {
-  it('deletes a leaf note', async () => {
+  it('throws a leaf note away instead of destroying it', async () => {
     const id = await mustCreate({ title: 'Leaf' });
     const result = await deleteNote(id, 'delete-subtree');
     expect(result.ok).toBe(true);
     expect(result.removedNoteCount).toBe(1);
-    expect(await getNote(id)).toBeUndefined();
+
+    // The row is still there, marked. Every listing goes through the snapshot,
+    // which is where the trash filter lives, so it is gone from the app without
+    // being gone from the device.
+    expect((await getNote(id))!.deletedAt).toBeGreaterThan(0);
+    expect((await getSnapshot()).notes.some((note) => note.id === id)).toBe(false);
   });
 
-  it('delete-subtree removes the whole branch', async () => {
+  it('delete-subtree throws the whole branch away as one recoverable batch', async () => {
     const root = await mustCreate({ title: 'Root' });
     const child = await mustCreate({ title: 'Child', parentNoteId: root });
     const grandchild = await mustCreate({ title: 'Grandchild', parentNoteId: child });
 
     const result = await deleteNote(root, 'delete-subtree');
     expect(result.removedNoteCount).toBe(3);
-    expect(await getNote(root)).toBeUndefined();
-    expect(await getNote(child)).toBeUndefined();
-    expect(await getNote(grandchild)).toBeUndefined();
+
+    const snapshot = await getSnapshot();
+    for (const id of [root, child, grandchild]) {
+      expect(snapshot.notes.some((note) => note.id === id)).toBe(false);
+    }
+
+    // One act, one entry: the branch comes back together or not at all.
+    expect(await countTrashed()).toEqual({ folders: 0, links: 0, notes: 3 });
+    const groups = await listTrashGroups();
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.noteCount).toBe(3);
+
+    await restoreBatch(groups[0]!.batch);
+    expect((await getNote(root))!.parentNoteId).toBeNull();
+    expect((await getNote(child))!.parentNoteId).toBe(root);
+    expect((await getNote(grandchild))!.parentNoteId).toBe(child);
+    expect((await getNote(child))!.deletedAt).toBeUndefined();
   });
 
-  it('keep-children promotes subnotes instead of deleting them', async () => {
+  it('keep-children promotes subnotes and throws away only the note itself', async () => {
     const root = await mustCreate({ title: 'Root' });
     const child = await mustCreate({ title: 'Child', parentNoteId: root });
     const grandchild = await mustCreate({ title: 'Grandchild', parentNoteId: child });
@@ -204,26 +225,43 @@ describe('deletion', () => {
     expect(result.removedNoteCount).toBe(1);
     expect(result.movedNoteCount).toBe(1);
 
-    expect(await getNote(child)).toBeUndefined();
+    // Promoted, not deleted, and never in the trash: promoting is a structural
+    // move, so there is nothing for the user to recover.
     const promoted = await getNote(grandchild);
-    expect(promoted!.parentNoteId).toBe(root); // promoted to where Child sat
+    expect(promoted!.parentNoteId).toBe(root);
+    expect(promoted!.deletedAt).toBeUndefined();
+    expect((await getNote(child))!.deletedAt).toBeGreaterThan(0);
 
     // Root is untouched.
-    expect(await getNote(root)).not.toBeUndefined();
+    expect((await getNote(root))!.deletedAt).toBeUndefined();
+    expect(await countTrashed()).toEqual({ folders: 0, links: 0, notes: 1 });
   });
 
-  it('never deletes saved links referenced by the removed notes', async () => {
+  it('never deletes saved links referenced by a thrown-away note', async () => {
     const noteId = await mustCreate({ title: 'With resources' });
     const linkId = await mustLink();
     await attachLinkToNote(noteId, linkId, 'attached');
 
     const result = await deleteNote(noteId, 'delete-subtree');
-    expect(result.removedReferenceCount).toBe(1);
+    // References are *kept* while the note is only thrown away, which is what
+    // makes restoring exact rather than a note that lost its links.
+    expect(result.removedReferenceCount).toBe(0);
 
-    // The link itself survives.
     const links = await listAllLinks();
     expect(links.some((link) => link.id === linkId)).toBe(true);
-    expect(await getNote(noteId)).toBeUndefined();
+
+    const groups = await listTrashGroups();
+    await restoreBatch(groups[0]!.batch);
+    expect(await linkIdsForNote(noteId)).toEqual([linkId]);
+
+    // Purging is the only thing that unlinks, and it does so for good.
+    const purgeId = await mustCreate({ title: 'Purge me' });
+    await attachLinkToNote(purgeId, linkId, 'attached');
+    expect(await deleteNote(purgeId, 'delete-subtree')).toMatchObject({ ok: true });
+    const again = await listTrashGroups();
+    await purgeBatch(again[0]!.batch);
+    expect(await linkIdsForNote(purgeId)).toEqual([]);
+    expect((await listAllLinks()).some((link) => link.id === linkId)).toBe(true);
   });
 
   it('reports the impact before deletion', async () => {
@@ -360,7 +398,7 @@ describe('link deletion cascade', () => {
     const linkId = await mustLink();
     await attachLinkToNote(noteId, linkId, 'created-from');
 
-    await deleteLink(linkId);
+    await deleteLinkPermanently(linkId);
     expect(await noteIdsForLink(linkId)).toEqual([]);
     expect(await getLink(linkId)).toBeUndefined();
     expect(await getNote(noteId)).not.toBeUndefined();
@@ -368,7 +406,7 @@ describe('link deletion cascade', () => {
 });
 
 describe('migration from a links-only vault', () => {
-  it('upgrades a version-2 database to version 3 without touching user rows', async () => {
+  it('upgrades a version-2 database to the current version without touching user rows', async () => {
     // Build a genuine v2 database with a plain Dexie instance declaring only
     // versions 1 and 2 -- exactly the schema a pre-notes build shipped.
     const legacy = new Dexie('legacy-v2-vault');
@@ -400,11 +438,11 @@ describe('migration from a links-only vault', () => {
     });
     await legacy.close();
 
-    // Re-open through the current schema: the v2 -> v3 and v3 -> v4 upgrades
+    // Re-open through the current schema: the v2 -> v5 upgrades
     // must run additively, adding tables without rewriting existing rows.
     const upgraded = new StashDatabase('legacy-v2-vault');
     await upgraded.open();
-    expect(upgraded.verno).toBe(4);
+    expect(upgraded.verno).toBe(5);
 
     const rows = await upgraded.links.toArray();
     expect(rows).toHaveLength(1);

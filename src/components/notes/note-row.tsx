@@ -6,6 +6,7 @@ import type { Note } from '@/db/types';
 import { checklistProgress } from '@/lib/markdown';
 import { formatRelative, pluralize } from '@/lib/format';
 import { notePlainText } from '@/lib/notes';
+import { useLongPress } from '@/hooks/use-long-press';
 import { useVaultStore } from '@/stores/vault-store';
 import { cn } from '@/lib/utils';
 
@@ -43,6 +44,9 @@ export function NoteRow({
   className,
 }: NoteRowProps) {
   const locked = useVaultStore((state) => state.protection.notes.has(note.id));
+  // Hold a note for the same sheet its ⋯ button opens, so every list in the app
+  // answers to the same gesture.
+  const { handlers, consumeLongPress } = useLongPress(onShowActions);
   const checklist = React.useMemo(() => checklistProgress(note.content), [note.content]);
   const preview = React.useMemo(() => notePlainText(note.content, 80), [note.content]);
 
@@ -56,7 +60,11 @@ export function NoteRow({
     <div className={cn('flex items-stretch gap-1 rounded-xl', highlight && 'ring-1 ring-accent/30 ring-inset', className)}>
       <button
         type="button"
-        onClick={onOpen}
+        onClick={() => {
+          if (consumeLongPress()) return;
+          onOpen();
+        }}
+        {...handlers}
         className="tap flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-left active:bg-surface-2"
       >
         <span

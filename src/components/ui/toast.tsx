@@ -23,6 +23,8 @@ export interface ToastAction {
 interface ToastRecord {
   id: string;
   message: string;
+  /** Second line, for the reassurance that does not belong in the headline. */
+  description?: string;
   tone: ToastTone;
   action?: ToastAction;
   duration: number;
@@ -49,6 +51,7 @@ const useToastStore = create<ToastStore>((set) => ({
 
 export interface ToastOptions {
   tone?: ToastTone;
+  description?: string;
   action?: ToastAction;
   duration?: number;
 }
@@ -59,6 +62,7 @@ export function toast(message: string, options: ToastOptions = {}): string {
     message,
     tone: options.tone ?? 'default',
     duration,
+    ...(options.description ? { description: options.description } : {}),
     ...(options.action ? { action: options.action } : {}),
   });
 }
@@ -102,7 +106,12 @@ function ToastRow({ record }: { record: ToastRecord }) {
           record.tone === 'default' && 'text-accent',
         )}
       />
-      <p className="min-w-0 flex-1 text-[0.9375rem] leading-snug text-fg">{record.message}</p>
+      <div className="min-w-0 flex-1">
+        <p className="text-[0.9375rem] leading-snug text-fg">{record.message}</p>
+        {record.description ? (
+          <p className="mt-0.5 text-xs leading-snug text-muted">{record.description}</p>
+        ) : null}
+      </div>
       {record.action ? (
         <button
           type="button"

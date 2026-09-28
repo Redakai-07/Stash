@@ -21,6 +21,8 @@ import { getVaultKey, readKeyring, toExportedKeyring } from '@/lib/privacy/keyri
 import { adoptExportedKeyring } from '@/lib/privacy/keyring';
 import { isSealed, openVault } from '@/lib/privacy/protection';
 import { reconcileProtection } from '@/lib/privacy/reconcile';
+import { countTrashed } from './trash';
+import { liveOnly } from '@/lib/trash';
 
 /**
  * Whole-vault operations: reading a consistent snapshot, exporting to a file
@@ -57,6 +59,13 @@ async function readVaultRaw(): Promise<VaultSnapshot> {
  * Decryption happens here — after the transaction has closed, never inside it —
  * so the read stays a plain database operation and the crypto never holds an
  * IndexedDB transaction open.
+ *
+ * Rows that have been thrown away are left out, and so are the references that
+ * pointed at them. This is the single place the trash filter is applied, for the
+ * same reason the lock filter has a single place: a screen that reads the
+ * snapshot cannot accidentally show a deleted row, because a deleted row is not
+ * in the snapshot. The trash itself reads the database directly, so it is the
+ * one surface that can still see them.
  */
 export async function getSnapshot(): Promise<VaultSnapshot> {
   const raw = await readVaultRaw();
@@ -64,7 +73,28 @@ export async function getSnapshot(): Promise<VaultSnapshot> {
     { folders: raw.folders, notes: raw.notes, links: raw.links },
     getVaultKey(),
   );
-  return { ...raw, folders: opened.folders, notes: opened.notes, links: opened.links };
+
+  const folders = liveOnly(opened.folders);
+  const links = liveOnly(opened.links);
+  const notes = liveOnly(opened.notes);
+  const linkIds = new Set(links.map((row) => row.id));
+  const noteIds = new Set(notes.map((row) => row.id));
+
+  return {
+    folders,
+    links,
+    notes,
+    tags: raw.tags,
+    // A reference to something in the trash describes a relationship the UI
+    // cannot show either end of, so it goes with the row.
+    linkTags: raw.linkTags.filter((row) => linkIds.has(row.linkId)),
+    noteLinks: raw.noteLinks.filter((row) => noteIds.has(row.noteId) && linkIds.has(row.linkId)),
+  };
+}
+
+/** Whether the vault currently holds anything recoverable. */
+export async function trashSummary(): Promise<{ folders: number; links: number; notes: number }> {
+  return countTrashed();
 }
 
 /**

@@ -9,6 +9,7 @@ import {
 import { isSessionLocked } from '@/lib/privacy/keyring';
 import { isSealed } from '@/lib/privacy/protection';
 import { isRelockPolicy } from '@/lib/privacy/session';
+import { isTrashed } from '@/lib/trash';
 
 /**
  * Small key-value store for preferences and capture history.
@@ -72,20 +73,23 @@ export async function setThemeMode(mode: ThemeMode): Promise<void> {
 }
 
 /**
- * Drop remembered destinations that point at folders which no longer exist, and
- * — while the vault is locked — at folders that are locked.
+ * Drop remembered destinations that point at folders which no longer exist, have
+ * been thrown away, and — while the vault is locked — at folders that are locked.
  *
  * Recents are persisted in plaintext `meta`, so a locked folder must not survive
  * in that list: the Capture sheet would otherwise offer a destination whose name
  * it is forbidden to reveal. Sealing is used as the test rather than recomputing
  * full protection, because a protected folder is always a sealed one and this
  * runs on every refresh.
+ *
+ * A trashed folder is dropped for the same reason a deleted one is: a destination
+ * you cannot save into is not a destination.
  */
 export async function pruneRecentFolders(): Promise<string[]> {
   const ids = await getRecentFolderIds();
   if (ids.length === 0) return [];
   const folders = await db.folders.toArray();
-  const existing = new Set(folders.map((folder) => folder.id));
+  const existing = new Set(folders.filter((folder) => !isTrashed(folder)).map((folder) => folder.id));
   let pruned = ids.filter((id) => existing.has(id));
 
   if (isSessionLocked()) {

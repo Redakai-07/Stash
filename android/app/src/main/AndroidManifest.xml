@@ -22,6 +22,40 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!--
+                The share target.
+
+                `text/*` rather than a list of named applications, and rather
+                than `text/plain` alone: any app that shares text can share into
+                Stash, including the ones that send text/html alongside it. There
+                is no source-specific handling anywhere in the app — the shared
+                text is parsed the same way whoever sent it.
+
+                `singleTask` is load-bearing. It makes Android route a share
+                into the running instance through `onNewIntent` instead of
+                building a second copy of the app, which is what gives the
+                closed / backgrounded / already-open cases one code path.
+                Sharing also brings Stash to the front, so the sheet is on screen
+                by the time the finger lifts.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/*" />
+            </intent-filter>
+
+            <!--
+                Several links at once, which browsers and YouTube offer for a
+                multi-selection. The plugin reads the first text it finds; the
+                link parser already understands text containing more than one
+                URL, so the extras surface as "also save these".
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/*" />
+            </intent-filter>
+
         </activity>
 
         <provider

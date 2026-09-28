@@ -11,6 +11,8 @@ import type {
   NoteLinkOrigin,
   SavedLink,
   Tag,
+  TrashEntry,
+  TrashImpact,
 } from '@/db/types';
 import { getSnapshot } from '@/db/repos/vault';
 import { ensureSeeded } from '@/db/seed';
@@ -31,19 +33,28 @@ import {
 } from '@/db/repos/folders';
 import {
   createLink as createLinkRepo,
-  deleteLink as deleteLinkRepo,
+  deleteLinkPermanently as discardLinkRepo,
   findDuplicates,
   listLinksInFolder,
   moveLink as moveLinkRepo,
   setLinkFavorite,
   setLinkArchived,
   setLinkLocked,
+  setLinkUnavailable as setLinkUnavailableRepo,
   touchLinkOpened,
   updateLink as updateLinkRepo,
   type CreateLinkInput,
   type DuplicateMatch,
   type UpdateLinkInput,
 } from '@/db/repos/links';
+import {
+  emptyTrash as emptyTrashRepo,
+  listTrashGroups,
+  purgeBatch as purgeBatchRepo,
+  restoreAll as restoreAllRepo,
+  restoreBatch as restoreBatchRepo,
+  trashLink as trashLinkRepo,
+} from '@/db/repos/trash';
 import { getRecentFolderIds, pruneRecentFolders, pushRecentFolder, setLastFolderId } from '@/db/repos/settings';
 import { listTags, setLinkTags } from '@/db/repos/tags';
 import {
@@ -118,6 +129,24 @@ export interface VaultState {
   sessionLocked: boolean;
   /** Ids withheld from search and listings. Empty while unlocked. */
   hidden: HiddenIds;
+  /**
+   * Live, unarchived links that have no folder: the Inbox.
+   *
+   * Derived once per refresh rather than filtered in each screen, because Home,
+   * Settings and the Inbox itself all ask the same question and none of them
+   * should walk the link list to answer it.
+   */
+  inboxLinks: SavedLink[];
+  /**
+   * What is in the trash, grouped into the acts that produced it.
+   *
+   * The trash is deliberately outside the snapshot: trash-aware filtering
+   * everywhere else is what makes the rest of the app unable to show a deleted
+   * row, and a surface that could see them would undo that. So it is read on
+   * demand, by the one screen whose whole purpose is to show them.
+   */
+  trashGroups: TrashEntry[];
+  trashLoaded: boolean;
 
   initialize: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -138,7 +167,12 @@ export interface VaultState {
   toggleLinkFavorite: (id: string, value?: boolean) => Promise<void>;
   archiveLink: (id: string, value: boolean) => Promise<void>;
   toggleLinkLocked: (id: string, value?: boolean) => Promise<void>;
+  /** Moves a link to the trash: recoverable, and what every "Delete" button does. */
   deleteLink: (id: string) => Promise<void>;
+  /** Permanently throws away a link created moments ago. The only undo path. */
+  discardLink: (id: string) => Promise<void>;
+  /** Record by hand that the address no longer works, or that it does again. */
+  setLinkUnavailable: (id: string, value: boolean) => Promise<void>;
   markLinkOpened: (id: string) => Promise<void>;
   duplicatesFor: (url: string, excludeId?: string) => Promise<DuplicateMatch[]>;
   linksInFolder: (folderId: string | null, includeNested?: boolean) => Promise<SavedLink[]>;
@@ -159,6 +193,27 @@ export interface VaultState {
   attachLink: (noteId: string, linkId: string, origin?: NoteLinkOrigin) => Promise<boolean>;
   detachLink: (noteId: string, linkId: string) => Promise<void>;
   createNoteFromLink: (linkId: string, parentNoteId?: string | null) => Promise<CreateNoteResult>;
+
+  // ---- Trash ---------------------------------------------------------------
+  /** Read the trash. Called by the Trash screen, not by `refresh`. */
+  loadTrash: () => Promise<void>;
+  restoreTrash: (batch: string) => Promise<TrashImpact>;
+  restoreAllTrash: () => Promise<TrashImpact>;
+  purgeTrash: (batch: string) => Promise<TrashImpact>;
+  emptyTrashNow: () => Promise<TrashImpact>;
+}
+
+/**
+ * Move live, unarchived links with no folder into the Inbox list.
+ *
+ * Sorted newest first: the Inbox is a queue of recent arrivals, so the thing you
+ * just saved from another app is at the top, which is the whole point of saving
+ * without filing.
+ */
+function inboxOf(links: readonly SavedLink[]): SavedLink[] {
+  return links
+    .filter((link) => !link.isArchived && link.folderId === null)
+    .sort((a, b) => b.createdAt - a.createdAt);
 }
 
 /**
@@ -201,6 +256,7 @@ async function loadEverything() {
     protection,
     sessionLocked,
     hidden,
+    inboxLinks: inboxOf(links),
   };
 }
 
@@ -218,6 +274,9 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   protection: { folders: new Set(), notes: new Set(), links: new Set() },
   sessionLocked: false,
   hidden: { folders: new Set(), notes: new Set(), links: new Set() },
+  inboxLinks: [],
+  trashGroups: [],
+  trashLoaded: false,
 
   initialize: async () => {
     if (get().status === 'ready') return;
@@ -357,7 +416,38 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   },
 
   deleteLink: async (id) => {
-    await deleteLinkRepo(id);
+    await trashLinkRepo(id);
+    await get().refresh();
+  },
+
+  /**
+   * Throw away a link that was created moments ago, for good.
+   *
+   * The undo on a fresh capture is not the same act as changing your mind about
+   * something you kept: the row is seconds old, nothing references it yet, and
+   * sending it to the trash would fill a recovery surface with noise. The only
+   * irreversible path in the product, reachable in exactly one place.
+   */
+  discardLink: async (id) => {
+    await discardLinkRepo(id);
+    await get().refresh();
+  },
+
+  setLinkUnavailable: async (id, value) => {
+    const now = Date.now();
+    // Optimistic: marking a dead address is a judgement the user just made by
+    // hand, and the badge should appear with the tap, not with the write.
+    set({
+      links: get().links.map((link) =>
+        link.id === id
+          ? value
+            ? { ...link, isUnavailable: true, unavailableAt: now }
+            : { ...link, isUnavailable: false }
+          : link,
+      ),
+    });
+    set({ inboxLinks: inboxOf(get().links) });
+    await setLinkUnavailableRepo(id, value);
     await get().refresh();
   },
 
@@ -471,6 +561,42 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     if (result.ok) await get().refresh();
     return result;
   },
+
+  loadTrash: async () => {
+    const trashGroups = await listTrashGroups();
+    set({ trashGroups, trashLoaded: true });
+  },
+
+  restoreTrash: async (batch) => {
+    const impact = await restoreBatchRepo(batch);
+    // The vault changed underneath the trash, so both sides are re-read: the
+    // trash because rows left it, the mirror because restored rows are now
+    // ordinary content that every screen must see.
+    await get().refresh();
+    await get().loadTrash();
+    return impact;
+  },
+
+  restoreAllTrash: async () => {
+    const impact = await restoreAllRepo();
+    await get().refresh();
+    await get().loadTrash();
+    return impact;
+  },
+
+  purgeTrash: async (batch) => {
+    const impact = await purgeBatchRepo(batch);
+    await get().refresh();
+    await get().loadTrash();
+    return impact;
+  },
+
+  emptyTrashNow: async () => {
+    const impact = await emptyTrashRepo();
+    await get().refresh();
+    await get().loadTrash();
+    return impact;
+  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -532,4 +658,55 @@ export function selectRecentDestinations(state: VaultState): Folder[] {
     .filter((folder): folder is Folder => Boolean(folder));
 }
 
-export { getRecentFolderIds };
+/**
+ * The Inbox, newest first.
+ *
+ * Already filtered by lock and by live-only at the snapshot boundary, so this
+ * needs no further guard: a list that reads it cannot leak anything.
+ */
+export function selectInboxLinks(state: VaultState): SavedLink[] {
+  return state.inboxLinks;
+}
+
+/** Links the user marked as no longer working, for a "needs attention" count. */
+export function selectUnavailableLinks(state: VaultState): SavedLink[] {
+  return state.links.filter((link) => link.isUnavailable && !link.isArchived);
+}
+
+/** Favorite notes, newest first, for the Favorites surface. */
+export function selectFavoriteNotes(state: VaultState): Note[] {
+  return state.visibleNotes
+    .filter((note) => note.isFavorite)
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+/** Favorite folders, in the order the library shows them. */
+export function selectFavoriteFolders(state: VaultState): Folder[] {
+  return state.folders.filter((folder) => folder.isFavorite);
+}
+
+/** Tag names in use, with how many live links carry each one. */
+export function selectTagUsage(state: VaultState): Array<{ name: string; count: number }> {
+  const namesById = new Map(state.tags.map((tag) => [tag.id, tag.name]));
+  const counts = new Map<string, number>();
+  for (const row of state.linkTags) {
+    const name = namesById.get(row.tagId);
+    if (!name) continue;
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => (b.count !== a.count ? b.count - a.count : a.name.localeCompare(b.name)));
+}
+
+/** Tag names for one link, alphabetically. */
+export function selectTagsForLink(state: VaultState, linkId: string): string[] {
+  const namesById = new Map(state.tags.map((tag) => [tag.id, tag.name]));
+  return state.linkTags
+    .filter((row) => row.linkId === linkId)
+    .map((row) => namesById.get(row.tagId))
+    .filter((name): name is string => Boolean(name))
+    .sort();
+}
+
+export { getRecentFolderIds, inboxOf };

@@ -1,7 +1,20 @@
 'use client';
 
 import * as React from 'react';
-import { AlertTriangle, Monitor, Moon, Shield, Sun, Trash2, Upload } from 'lucide-react';
+import Link from 'next/link';
+import {
+  AlertTriangle,
+  Archive,
+  ChevronRight,
+  Inbox,
+  Monitor,
+  Moon,
+  Shield,
+  Sun,
+  Trash2,
+  Upload,
+} from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { PrivacySettings } from '@/components/privacy/privacy-settings';
 import { ExportPanel } from '@/components/backup/export-panel';
 import { ImportFlow } from '@/components/backup/import-flow';
@@ -25,6 +38,13 @@ import { cn } from '@/lib/utils';
 export default function SettingsPage() {
   const folders = useVaultStore((state) => state.folders);
   const links = useVaultStore((state) => state.links);
+  const notes = useVaultStore((state) => state.visibleNotes);
+  const inboxCount = useVaultStore((state) => state.inboxLinks.length);
+  const unavailableCount = useVaultStore(
+    (state) => state.links.filter((link) => link.isUnavailable && !link.isArchived).length,
+  );
+  const trashCount = useVaultStore((state) => state.trashGroups.length);
+  const loadTrash = useVaultStore((state) => state.loadTrash);
   const refresh = useVaultStore((state) => state.refresh);
   const mode = useThemeStore((state) => state.mode);
   const setMode = useThemeStore((state) => state.setMode);
@@ -35,7 +55,13 @@ export default function SettingsPage() {
 
   const activeLinks = links.filter((link) => !link.isArchived);
   const archived = links.length - activeLinks.length;
-  const notes = activeLinks.filter((link) => link.userNote?.trim()).length;
+  const withNotes = activeLinks.filter((link) => link.userNote?.trim()).length;
+
+  // The trash count is needed here to label the entry point, so it is read when
+  // Settings opens rather than only when the Trash screen is visited.
+  React.useEffect(() => {
+    void loadTrash();
+  }, [loadTrash]);
 
   const handleErase = async () => {
     setBusy(true);
@@ -82,11 +108,63 @@ export default function SettingsPage() {
       <PrivacySettings />
 
       <Section title="Your vault">
-        <div className="mx-4 overflow-hidden rounded-2xl border border-border bg-surface">
+        <div className="mx-4 overflow-hidden rounded-2xl border-border bg-surface border">
           <StatRow label="Saved links" value={pluralize(activeLinks.length, 'link')} />
-          <StatRow label="With notes" value={pluralize(notes, 'link')} />
+          <StatRow label="Notes" value={pluralize(notes.length, 'note')} />
+          <StatRow label="With your own note" value={pluralize(withNotes, 'link')} />
           <StatRow label="Folders" value={pluralize(folders.length, 'folder')} />
+          <StatRow label="In the Inbox" value={pluralize(inboxCount, 'link')} />
+          <StatRow label="Marked unavailable" value={pluralize(unavailableCount, 'link')} />
           <StatRow label="Archived" value={pluralize(archived, 'link')} last />
+        </div>
+
+        {/*
+          Recovery is grouped here rather than buried under the vault numbers,
+          because the trash is the answer to "I deleted that by mistake" and that
+          question is asked in a hurry.
+        */}
+        <div className="mx-4 mt-3 flex flex-col gap-2">
+          <Link
+            href="/inbox"
+            className="tap flex items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 active:bg-surface-2"
+          >
+            <Inbox size={18} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[0.9375rem] font-medium text-fg">Inbox</span>
+              <span className="block text-xs text-subtle">
+                {inboxCount === 0 ? 'Nothing waiting to be organized' : `${inboxCount} to file`}
+              </span>
+            </span>
+            <ChevronRight size={17} strokeWidth={2} className="shrink-0 text-subtle" aria-hidden />
+          </Link>
+          <Link
+            href="/search?filter=archived"
+            className="tap flex items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 active:bg-surface-2"
+          >
+            <Archive size={18} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[0.9375rem] font-medium text-fg">Archive</span>
+              <span className="block text-xs text-subtle">
+                {archived === 0 ? 'Nothing archived' : `${pluralize(archived, 'thing')} kept out of the way`}
+              </span>
+            </span>
+            <ChevronRight size={17} strokeWidth={2} className="shrink-0 text-subtle" aria-hidden />
+          </Link>
+          <Link
+            href="/trash"
+            className="tap flex items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 active:bg-surface-2"
+          >
+            <RotateCcw size={18} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[0.9375rem] font-medium text-fg">Trash</span>
+              <span className="block text-xs text-subtle">
+                {trashCount === 0
+                  ? 'Everything you delete can be restored'
+                  : `${pluralize(trashCount, 'thing')} you can restore`}
+              </span>
+            </span>
+            <ChevronRight size={17} strokeWidth={2} className="shrink-0 text-subtle" aria-hidden />
+          </Link>
         </div>
         <p className="flex items-start gap-2 px-5 pt-2.5 text-xs leading-relaxed text-subtle">
           <Shield size={14} strokeWidth={2} className="mt-0.5 shrink-0" aria-hidden />
@@ -120,8 +198,9 @@ export default function SettingsPage() {
         <div className="mx-4 rounded-2xl border border-danger/30 bg-danger-soft p-4">
           <p className="text-[0.9375rem] font-semibold text-danger">Erase everything</p>
           <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-fg/80">
-            Deletes {pluralize(activeLinks.length, 'link')} and {pluralize(folders.length, 'folder')} from this
-            device. Export first if you want a copy — this cannot be undone.
+            Deletes {pluralize(activeLinks.length, 'link')}, {pluralize(notes.length, 'note')} and{' '}
+            {pluralize(folders.length, 'folder')} from this device, including anything in the trash. Export first
+            if you want a copy — this cannot be undone.
           </p>
           <div className="mt-3.5 flex items-center justify-between gap-3">
             <span className="text-[0.8125rem] font-medium text-fg">I understand this is permanent</span>

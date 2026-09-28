@@ -29,6 +29,7 @@ import { reconcileProtection } from '@/lib/privacy/reconcile';
 import { APP_VERSION } from '@/lib/version';
 import type { ImportCounts, ImportPlan } from '@/lib/backup/merge';
 import { getPrivacySettings } from './settings';
+import { liveOnly } from '@/lib/trash';
 
 /**
  * Exporting, backing up and restoring, as database work.
@@ -158,13 +159,29 @@ export async function buildBackup(options: {
   const snapshot = await readVaultRaw();
   const settings = await getPortableSettings();
 
+  // The trash is deliberately left behind. It is a recovery surface for *this*
+  // device — "I deleted that a minute ago" — not part of the vault a person
+  // backs up. Carrying it would also be actively harmful: the row fields that
+  // mark a row as thrown away are not part of the format, so an imported
+  // trashed row would arrive as a live one and resurrect data the user deleted.
+  // Excluding it from the file is the honest reading of "your vault".
+  const liveFolders = liveOnly(snapshot.folders);
+  const liveLinks = liveOnly(snapshot.links);
+  const liveNotes = liveOnly(snapshot.notes);
+  const liveLinkIds = new Set(liveLinks.map((row) => row.id));
+  const liveNoteIds = new Set(liveNotes.map((row) => row.id));
+
   let data: BackupData = {
-    folders: snapshot.folders,
-    links: snapshot.links,
+    folders: liveFolders,
+    links: liveLinks,
     tags: snapshot.tags,
-    linkTags: snapshot.linkTags,
-    notes: snapshot.notes,
-    noteLinks: snapshot.noteLinks,
+    // A join row whose either end is in the trash describes a relationship the
+    // restored vault could not show, so it goes with the row.
+    linkTags: snapshot.linkTags.filter((row) => liveLinkIds.has(row.linkId)),
+    notes: liveNotes,
+    noteLinks: snapshot.noteLinks.filter(
+      (row) => liveLinkIds.has(row.linkId) && liveNoteIds.has(row.noteId),
+    ),
     settings,
   };
 

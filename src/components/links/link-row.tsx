@@ -1,10 +1,10 @@
 'use client';
 
-import * as React from 'react';
-import { Lock, MoreHorizontal, Star } from 'lucide-react';
+import { Link2Off, Lock, MoreHorizontal, Star } from 'lucide-react';
 import type { SavedLink } from '@/db/types';
 import { displayUrl, formatRelative, tintForId } from '@/lib/format';
-import { useVaultStore } from '@/stores/vault-store';
+import { useLongPress } from '@/hooks/use-long-press';
+import { useVaultStore, selectTagsForLink } from '@/stores/vault-store';
 import { cn } from '@/lib/utils';
 
 /**
@@ -36,8 +36,6 @@ export interface LinkRowProps {
   className?: string;
 }
 
-const LONG_PRESS_MS = 480;
-
 export function LinkRow({
   link,
   context,
@@ -50,35 +48,18 @@ export function LinkRow({
   // The row subscribes to the lock set rather than taking a prop, so a new list
   // cannot forget to mark a locked item.
   const locked = useVaultStore((state) => state.protection.links.has(link.id));
+  // Same reason: tags ride along with the row instead of every caller having to
+  // thread them through, so a list added later shows them for free.
+  const tags = useVaultStore((state) => selectTagsForLink(state, link.id));
   const tint = TINT_CLASS[tintForId(link.source ?? link.id)] ?? TINT_CLASS.accent;
   const initial = (link.source ?? 'link').replace(/^www\./, '').slice(0, 1).toUpperCase();
 
-  const pressTimer = React.useRef<number | null>(null);
-  const longPressed = React.useRef(false);
-
-  const clearPress = () => {
-    if (pressTimer.current !== null) {
-      window.clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
-  };
-
   // Long press is a shortcut to the same sheet the ⋯ button opens, for anyone
   // who reaches for it; the visible button keeps it discoverable.
-  const onPointerDown = () => {
-    longPressed.current = false;
-    clearPress();
-    pressTimer.current = window.setTimeout(() => {
-      longPressed.current = true;
-      onShowActions();
-    }, LONG_PRESS_MS);
-  };
+  const { handlers, consumeLongPress } = useLongPress(onShowActions);
 
   const handleOpen = () => {
-    if (longPressed.current) {
-      longPressed.current = false;
-      return;
-    }
+    if (consumeLongPress()) return;
     onOpen();
   };
 
@@ -93,14 +74,7 @@ export function LinkRow({
       <button
         type="button"
         onClick={handleOpen}
-        onPointerDown={onPointerDown}
-        onPointerUp={clearPress}
-        onPointerCancel={clearPress}
-        onPointerLeave={clearPress}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          onShowActions();
-        }}
+        {...handlers}
         className="tap flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-left active:bg-surface-2"
       >
         <span className={cn('flex size-9 shrink-0 items-center justify-center rounded-xl text-[0.8125rem] font-bold', tint)}>
@@ -122,9 +96,31 @@ export function LinkRow({
             {link.isFavorite ? (
               <Star size={12} strokeWidth={2.4} className="shrink-0 text-warning" aria-label="Favorite" />
             ) : null}
+            {link.isUnavailable ? (
+              <Link2Off
+                size={12}
+                strokeWidth={2.4}
+                className="shrink-0 text-danger"
+                aria-label="Marked as no longer working"
+              />
+            ) : null}
           </span>
           <span className="mt-0.5 flex items-center gap-1.5 text-xs text-subtle">
             <span className="truncate">{link.source ?? displayUrl(link.url, 32)}</span>
+            {/*
+              Tags ride on the metadata line rather than their own row. A list is
+              for scanning, and a second line of chips on tagged items would make
+              the rows uneven for the sake of something the ⋯ sheet shows in full.
+            */}
+            {tags.length > 0 ? (
+              <>
+                <span aria-hidden>·</span>
+                <span className="shrink-0 truncate text-accent">
+                  {tags.slice(0, 2).join(', ')}
+                  {tags.length > 2 ? ` +${tags.length - 2}` : ''}
+                </span>
+              </>
+            ) : null}
             {context ? (
               <>
                 <span aria-hidden>·</span>

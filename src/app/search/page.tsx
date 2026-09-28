@@ -2,12 +2,12 @@
 
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Clock, Search as SearchIcon, SearchX, X } from 'lucide-react';
+import { Clock, Search as SearchIcon, SearchX, Tag as TagIcon, X } from 'lucide-react';
 import type { Note, SavedLink } from '@/db/types';
 import { SEARCH_FILTERS, searchVault, type SearchFilter } from '@/lib/search';
 import { pluralize } from '@/lib/format';
 import { openExternal } from '@/lib/open-external';
-import { useVaultStore } from '@/stores/vault-store';
+import { useVaultStore, selectTagUsage } from '@/stores/vault-store';
 import { PageHeader, Section } from '@/components/ui/page';
 import { LinkRow } from '@/components/links/link-row';
 import { LinkActionsSheet } from '@/components/links/link-actions-sheet';
@@ -38,8 +38,11 @@ function SearchView() {
   const params = useSearchParams();
   const router = useRouter();
   const initialFilter = params.get('filter');
+  // `?q=` lets another screen hand a query over — the tag chips on Home do
+  // exactly that, so tapping a tag is one tap rather than typing it again.
+  const initialQuery = params.get('q') ?? '';
 
-  const [query, setQuery] = React.useState('');
+  const [query, setQuery] = React.useState(initialQuery);
   const [filter, setFilter] = React.useState<SearchFilter>(isFilter(initialFilter) ? initialFilter : 'all');
   const [activeLink, setActiveLink] = React.useState<SavedLink | null>(null);
   const [activeNote, setActiveNote] = React.useState<Note | null>(null);
@@ -51,6 +54,7 @@ function SearchView() {
   const notes = useVaultStore((state) => state.notes);
   const noteLinks = useVaultStore((state) => state.noteLinks);
   const hidden = useVaultStore((state) => state.hidden);
+  const tagsInUse = useVaultStore(selectTagUsage);
   const toggleLinkFavorite = useVaultStore((state) => state.toggleLinkFavorite);
   const markLinkOpened = useVaultStore((state) => state.markLinkOpened);
 
@@ -66,9 +70,12 @@ function SearchView() {
           query,
           filter,
           limit: 120,
-          folderLimit: searching ? 8 : 0,
+          folderLimit: searching ? 8 : 12,
           noteLimit: 80,
-          includeFolders: searching,
+          // Browse shows folders too: the folder group is how a folder gets found
+          // without walking the tree, and under the Favorites filter it is how
+          // the starred folders appear alongside the starred links and notes.
+          includeFolders: searching || filter === 'favorites',
           // Belt and braces: the collections above are already filtered, and the
           // search engine filters again from these sets. Two independent points
           // have to be wrong before a locked item can appear in a result.
@@ -77,6 +84,10 @@ function SearchView() {
       ),
     [folders, links, tags, linkTags, notes, noteLinks, hidden, query, filter, searching],
   );
+
+  // The tag shelf is a browsing aid, not a result: it only appears when the user
+  // has typed nothing, so it never competes with what they were looking for.
+  const showTags = !searching && filter === 'all' && tagsInUse.length > 0;
 
   const folderNameById = React.useMemo(
     () => new Map(folders.map((folder) => [folder.id, folder.name])),
@@ -159,8 +170,27 @@ function SearchView() {
         </div>
       </PageHeader>
 
+      {showTags ? (
+        <Section title="Tags">
+          <div className="flex flex-wrap gap-1.5 px-4 pb-1">
+            {tagsInUse.slice(0, 24).map((tag) => (
+              <button
+                key={tag.name}
+                type="button"
+                onClick={() => setQuery(tag.name)}
+                className="tap flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 active:bg-surface-2"
+              >
+                <TagIcon size={12} strokeWidth={2.2} className="text-subtle" aria-hidden />
+                <span className="text-[0.8125rem] font-medium text-fg">{tag.name}</span>
+                <span className="text-[0.6875rem] text-subtle">{tag.count}</span>
+              </button>
+            ))}
+          </div>
+        </Section>
+      ) : null}
+
       {outcome.folders.length > 0 ? (
-        <Section title="Folders">
+        <Section title={filter === 'favorites' ? 'Favorite folders' : 'Folders'}>
           <div className="flex flex-col gap-0.5 px-2">
             {outcome.folders.map((hit) => (
               <FolderRow
@@ -231,12 +261,24 @@ function SearchView() {
             <SearchX size={22} strokeWidth={1.7} aria-hidden />
           </span>
           <p className="text-[0.9375rem] font-semibold text-fg">
-            {query.trim() ? 'Nothing matches that' : filter === 'all' ? 'Your vault is empty' : 'Nothing here yet'}
+            {query.trim()
+              ? 'Nothing matches that'
+              : filter === 'archived'
+                ? 'Nothing is archived'
+                : filter === 'favorites'
+                  ? 'No favorites yet'
+                  : filter === 'all'
+                    ? 'Your vault is empty'
+                    : 'Nothing here yet'}
           </p>
           <p className="max-w-xs text-[0.8125rem] leading-relaxed text-muted">
             {query.trim()
               ? 'Search covers link titles, addresses, your own notes and subnotes, tags and folder names. Everything is searched on this device.'
-              : 'Save a link or write a note and it will show up here, searchable offline.'}
+              : filter === 'archived'
+                ? 'Archiving keeps a link or note without deleting it. Archived items are hidden from every other view, and this filter is the one place they show up — so they stay findable instead of gone.'
+                : filter === 'favorites'
+                  ? 'Star a link, a note or a folder and it appears here. Favoriting never moves anything, so your structure stays exactly as you built it.'
+                  : 'Save a link or write a note and it will show up here, searchable offline.'}
           </p>
         </div>
       ) : null}
@@ -245,6 +287,13 @@ function SearchView() {
         <p className="flex items-center justify-center gap-1.5 px-4 py-6 text-xs text-subtle">
           <Clock size={13} strokeWidth={2} aria-hidden />
           Newest first · searched offline
+        </p>
+      ) : null}
+
+      {filter === 'archived' && (outcome.links.length > 0 || outcome.notes.length > 0) ? (
+        <p className="px-5 py-6 text-center text-xs leading-relaxed text-subtle">
+          Archived items are hidden from Home, the Library and every other filter. Open one and choose
+          &ldquo;Restore from archive&rdquo; to bring it back.
         </p>
       ) : null}
 

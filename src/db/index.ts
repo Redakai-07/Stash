@@ -152,6 +152,37 @@ class StashDatabase extends Dexie {
         });
       });
 
+    // ---- Version 5: trash, and link health ----------------------------------
+    // Additive again, and the smallest kind of schema change there is: an index
+    // on `deletedAt` so the trash screen reads only thrown-away rows instead of
+    // scanning the whole vault to find them. No row is read, rewritten or
+    // reordered, and no field is required — a row without `deletedAt` is a live
+    // row, which is exactly what every existing row is.
+    //
+    // The index is what makes `where('deletedAt').above(0)` a real query rather
+    // than a filter. It also cannot lie: IndexedDB omits rows whose indexed key
+    // is absent, so a live row can never turn up in a trash lookup.
+    this.version(5)
+      .stores({
+        folders:
+          'id, parentId, name, sortOrder, updatedAt, deletedAt, [parentId+sortOrder]',
+        links:
+          'id, folderId, normalizedUrl, createdAt, updatedAt, lastOpenedAt, deletedAt, [folderId+createdAt]',
+        tags: 'id, &name',
+        linkTags: '[linkId+tagId], linkId, tagId',
+        notes:
+          'id, parentNoteId, title, sortOrder, createdAt, updatedAt, deletedAt, [parentNoteId+sortOrder]',
+        noteLinks: '[noteId+linkId], noteId, linkId, createdAt',
+        meta: 'key',
+        security: 'key',
+      })
+      .upgrade(async (transaction) => {
+        await transaction.table<MetaRow, string>('meta').put({
+          key: META_KEYS.schemaInfo,
+          value: { version: 5, migratedAt: Date.now() },
+        });
+      });
+
     // A newer build (or another tab) upgraded the schema: close so the other
     // context can proceed instead of us writing through a stale schema.
     this.on('versionchange', () => {

@@ -1,5 +1,5 @@
 import { newId } from '../id';
-import { db, type Folder, type FolderDeletionImpact, type SavedLink } from '../index';
+import { db, type Folder, type FolderDeletionImpact } from '../index';
 import {
   canMoveFolder,
   descendantIdsOf,
@@ -11,6 +11,7 @@ import { computeFolderStats, type FolderStats } from '@/lib/folder-stats';
 import { isFolderProtected } from '@/lib/privacy/context';
 import { getVaultKey } from '@/lib/privacy/keyring';
 import { isSealed, openFolder, sealFolder } from '@/lib/privacy/protection';
+import { trashFolder, trashFolderShell } from './trash';
 import { reconcileProtection } from '@/lib/privacy/reconcile';
 
 export type { FolderStats };
@@ -226,18 +227,40 @@ export type DeleteStrategy = 'move-contents-up' | 'delete-everything';
 export interface DeleteFolderResult {
   ok: boolean;
   removedFolderCount: number;
-  /** Links deleted outright (delete-everything). */
+  /**
+   * Rows moved to the trash rather than destroyed. `delete-everything` is
+   * recoverable now, so this is a count of what went to the trash, not a count
+   * of what was lost.
+   */
   removedLinkCount: number;
   /** Links re-homed into the parent folder (move-contents-up). */
   movedLinkCount: number;
 }
 
 /**
- * Deleting is always explicit about what happens to the contents. There is no
- * code path that removes a folder's data as a side effect of removing the
- * folder itself.
+ * Removing a folder, with the contents accounted for either way.
+ *
+ * The two strategies mean different things and neither destroys data:
+ *
+ *  - `move-contents-up` is a *structural* act — the links and subfolders are
+ *    re-homed upward, so nothing of theirs needs recovering, and the folder
+ *    itself goes to the trash so its name is recoverable too;
+ *  - `delete-everything` throws the folder and its contents into the trash as one
+ *    batch. It used to be permanent; it is recoverable now, which is the whole
+ *    point of having a trash, and the reason a folder can be got back in one
+ *    piece rather than folder-by-folder.
  */
 export async function deleteFolder(id: string, strategy: DeleteStrategy): Promise<DeleteFolderResult> {
+  if (strategy === 'delete-everything') {
+    const impact = await trashFolder(id);
+    return {
+      ok: impact.folders > 0,
+      removedFolderCount: impact.folders,
+      removedLinkCount: impact.links,
+      movedLinkCount: 0,
+    };
+  }
+
   const result = await db.transaction('rw', db.folders, db.links, async () => {
     const folders = await db.folders.toArray();
     const folder = folders.find((candidate) => candidate.id === id);
@@ -248,18 +271,6 @@ export async function deleteFolder(id: string, strategy: DeleteStrategy): Promis
     const descendants = descendantIdsOf(folders, id);
     const doomedFolders = [id, ...descendants];
     const parentId = folder.parentId;
-
-    if (strategy === 'delete-everything') {
-      const links = await db.links.where('folderId').anyOf(doomedFolders).toArray();
-      await db.links.bulkDelete(links.map((link: SavedLink) => link.id));
-      await db.folders.bulkDelete(doomedFolders);
-      return {
-        ok: true,
-        removedFolderCount: doomedFolders.length,
-        removedLinkCount: links.length,
-        movedLinkCount: 0,
-      };
-    }
 
     // move-contents-up: links in this exact folder are re-homed; all deeper
     // folders are flattened into the parent so nothing is lost. Their links
@@ -286,7 +297,10 @@ export async function deleteFolder(id: string, strategy: DeleteStrategy): Promis
       ),
     );
 
-    await db.folders.delete(id);
+    // The folder goes to the trash rather than being deleted, so even its name
+    // is recoverable. Restoring it returns an empty folder to the level its
+    // contents were re-homed into.
+    await trashFolderShell(id);
     return {
       ok: true,
       removedFolderCount: 1,

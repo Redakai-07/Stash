@@ -10,6 +10,7 @@ import {
   FolderPlus,
   Lock,
   Pencil,
+  Share2,
   Star,
   Trash2,
   Unlock,
@@ -17,8 +18,9 @@ import {
 import { useRouter } from 'next/navigation';
 import type { Folder } from '@/db/types';
 import { FOLDER_ICON_CHOICES, Icon } from '@/components/ui/icon';
-import { canMoveFolder, folderPathLabel, type MoveCheck } from '@/lib/tree';
+import { canMoveFolder, descendantIdsOf, folderPathLabel, type MoveCheck } from '@/lib/tree';
 import { pluralize } from '@/lib/format';
+import { folderDigest, shareOut } from '@/lib/share/share-out';
 import { useBackDismiss } from '@/hooks/use-back-dismiss';
 import { useVaultStore } from '@/stores/vault-store';
 import { usePrivacyStore } from '@/stores/privacy-store';
@@ -34,10 +36,11 @@ import { INBOX_DESTINATION, folderDestination } from '@/lib/destination';
 /**
  * Folder management.
  *
- * Deleting a folder is the one genuinely destructive action in the product, so
- * it never happens as a side effect: the sheet states exactly what is inside,
- * offers "move contents up" as the default, and requires an explicit choice
- * before anything is removed.
+ * Deleting a folder never happens as a side effect: the sheet states exactly what
+ * is inside, offers "move contents up" as the default, and requires an explicit
+ * choice before anything moves. Neither choice destroys anything — the second
+ * one puts the folder and its links in the trash as one batch, which is what
+ * makes a mis-tap on a folder with ninety links in it recoverable.
  */
 
 type Mode = 'actions' | 'rename' | 'move' | 'delete' | 'subfolder';
@@ -150,6 +153,39 @@ export function FolderActionsSheet({ folder, onClose, onDeleted }: FolderActions
     close();
   };
 
+  /**
+   * Send the folder's contents to another app as readable lines.
+   *
+   * Sharing the *structure* rather than a database file is deliberate: a digest
+   * of titles and addresses is useful in any messaging app on any platform, while
+   * a partial Stash backup would need its own format version, its own validation
+   * and its own reader — and would still be unreadable to whoever received it.
+   */
+  const shareContents = async () => {
+    const subtree = new Set<string>([folder.id, ...descendantIdsOf(folders, folder.id)]);
+    const inside = links.filter(
+      (link) => !link.isArchived && link.folderId !== null && subtree.has(link.folderId),
+    );
+    if (inside.length === 0) {
+      toast('Nothing in this folder to share yet');
+      return;
+    }
+
+    const text = folderDigest({
+      name: folder.name,
+      links: inside.map((link) => ({
+        url: link.url,
+        ...(link.title ? { title: link.title } : {}),
+        ...(link.folderId ? { folderPath: folderPathLabel(folders, link.folderId) } : {}),
+      })),
+    });
+
+    const outcome = await shareOut({ text, title: folder.name });
+    if (outcome === 'copied') toast(`Copied ${pluralize(inside.length, 'link')} to the clipboard`);
+    else if (outcome === 'failed') toast('Could not share that', { tone: 'danger' });
+    close();
+  };
+
   const handleDelete = async (strategy: 'move-contents-up' | 'delete-everything') => {
     setBusy(true);
     const ok = await useVaultStore.getState().deleteFolder(folder.id, strategy);
@@ -158,8 +194,11 @@ export function FolderActionsSheet({ folder, onClose, onDeleted }: FolderActions
       toast('Could not delete that folder', { tone: 'danger' });
       return;
     }
-    toast(strategy === 'move-contents-up' ? 'Folder removed, contents kept' : 'Folder and contents deleted', {
+    toast(strategy === 'move-contents-up' ? 'Folder removed, contents kept' : 'Moved to trash', {
       tone: strategy === 'move-contents-up' ? 'success' : 'default',
+      ...(strategy === 'move-contents-up'
+        ? {}
+        : { description: 'The whole folder is recoverable from Settings → Trash.' }),
     });
     onDeleted?.(folder.id);
     close();
@@ -289,8 +328,8 @@ export function FolderActionsSheet({ folder, onClose, onDeleted }: FolderActions
                   disabled={busy}
                 />
                 <ChoiceCard
-                  title="Delete everything inside"
-                  description={`${pluralize(impact?.total ?? 0, 'link')} and ${pluralize(impact?.descendants ?? 0, 'subfolder')} are removed permanently.`}
+                  title="Delete the folder and everything in it"
+                  description={`${pluralize(impact?.total ?? 0, 'link')} and ${pluralize(impact?.descendants ?? 0, 'subfolder')} move to the trash together, and come back together.`}
                   destructive
                   onClick={() => void handleDelete('delete-everything')}
                   disabled={busy}
@@ -386,6 +425,11 @@ export function FolderActionsSheet({ folder, onClose, onDeleted }: FolderActions
                     .reorderFolder(folder.id, 'down')
                     .then((ok) => toast(ok ? 'Moved down' : 'Already at the bottom'));
                 }}
+              />
+              <ActionRow
+                icon={<Share2 size={18} strokeWidth={1.9} aria-hidden />}
+                label="Share the links inside"
+                onClick={() => void shareContents()}
               />
               <ActionRow
                 icon={<Archive size={18} strokeWidth={1.9} aria-hidden />}

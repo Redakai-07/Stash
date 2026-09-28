@@ -284,6 +284,14 @@ export function readLinks(value: unknown, collector: ReadCollector): SavedLink[]
     if (sourcePackage) link.sourcePackage = sourcePackage;
     const lastOpenedAt = reader.optionalCount(entry, 'lastOpenedAt');
     if (lastOpenedAt !== undefined) link.lastOpenedAt = lastOpenedAt;
+    // Link health is a note the user made about the address, not part of the
+    // address, so it travels sealed or unsealed: losing it on restore would be
+    // losing a judgement the user made by hand, with no way to re-derive it.
+    if (reader.flag(entry, 'isUnavailable', false)) {
+      link.isUnavailable = true;
+      const unavailableAt = reader.optionalCount(entry, 'unavailableAt');
+      if (unavailableAt !== undefined) link.unavailableAt = unavailableAt;
+    }
     if (enc) link.enc = enc;
 
     links.push(link);

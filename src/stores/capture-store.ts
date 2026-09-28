@@ -81,6 +81,14 @@ interface CaptureState {
   recheckDuplicates: () => Promise<void>;
   acknowledgeDuplicate: () => void;
   save: () => Promise<SaveOutcome>;
+  /**
+   * The fastest path there is: file nothing, decide nothing, be done.
+   *
+   * Sets the destination and saves in the same call so the whole thing is one
+   * tap. A hurried capture must not be able to land anywhere except the Inbox,
+   * whatever the sheet happened to be showing when the button was pressed.
+   */
+  saveToInbox: () => Promise<SaveOutcome>;
   moveExisting: (linkId: string) => Promise<SaveOutcome>;
   reset: () => void;
 }
@@ -262,6 +270,11 @@ export const useCaptureStore = create<CaptureState>((set, get) => ({
       showCreateFolder: false,
     });
     return { ok: true, link, savedCount };
+  },
+
+  saveToInbox: async () => {
+    set({ destination: INBOX_DESTINATION, showCreateFolder: false });
+    return get().save();
   },
 
   moveExisting: async (linkId) => {

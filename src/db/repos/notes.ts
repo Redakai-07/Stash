@@ -7,18 +7,13 @@ import {
   type NoteLinkOrigin,
   type SavedLink,
 } from '../index';
-import {
-  canMoveNote,
-  nextNoteSortOrder,
-  noteDeletionImpact,
-  noteDescendantIds,
-  type MoveCheck,
-} from '@/lib/tree';
+import { canMoveNote, nextNoteSortOrder, noteDeletionImpact, type MoveCheck } from '@/lib/tree';
 import { contentFromLink, deriveNoteTitle, sanitizeNoteTitle, titleFromLink } from '@/lib/notes';
 import { getVaultKey } from '@/lib/privacy/keyring';
 import { isNoteParentProtected } from '@/lib/privacy/context';
 import { isSealed, openNote, sealNote } from '@/lib/privacy/protection';
 import { reconcileProtection } from '@/lib/privacy/reconcile';
+import { trashNote } from './trash';
 
 /**
  * Note persistence.
@@ -296,45 +291,42 @@ export function groupLinksByNote(noteLinks: readonly NoteLink[]): Map<string, st
 }
 
 /**
- * Delete a note.
+ * Throw a note away.
  *
- * `keep-children` promotes the subnotes to where the note used to sit, which is
- * the safe default the UI recommends. `delete-subtree` removes the branch. In
- * both cases saved links survive untouched -- only the references from the
- * removed notes are cleaned up.
+ * `delete-subtree` takes the whole branch as one batch, so restoring it puts the
+ * branch back together. `keep-children` is the gentler act and the one the UI
+ * recommends: the subnotes are promoted into the note's place, so only the note
+ * itself goes.
+ *
+ * In neither case is anything destroyed, and in neither case are references
+ * touched. A note's links stay referenced by it while it sits in the trash and
+ * are there again the moment it comes back — unlinking is what *purging* does,
+ * not what throwing away does.
  */
 export async function deleteNote(id: string, strategy: NoteDeleteStrategy): Promise<DeleteNoteResult> {
-  const result = await db.transaction('rw', db.notes, db.noteLinks, async () => {
+  if (strategy === 'delete-subtree') {
+    const impact = await trashNote(id, 'delete-subtree');
+    return {
+      ok: impact.notes > 0,
+      removedNoteCount: impact.notes,
+      movedNoteCount: 0,
+      removedReferenceCount: 0,
+    };
+  }
+
+  const result = await db.transaction('rw', db.notes, async () => {
     const notes = await db.notes.toArray();
     const note = notes.find((candidate) => candidate.id === id);
     if (!note) {
-      return { ok: false, removedNoteCount: 0, movedNoteCount: 0, removedReferenceCount: 0 };
+      return { ok: false, movedNoteCount: 0 };
     }
 
-    const descendants = noteDescendantIds(notes, id);
-    const doomed = [id, ...descendants];
-
-    const references = await db.noteLinks.where('noteId').anyOf(doomed).toArray();
-    if (references.length > 0) {
-      await db.noteLinks.bulkDelete(
-        references.map((reference) => [reference.noteId, reference.linkId] as [string, string]),
-      );
-    }
-
-    if (strategy === 'delete-subtree') {
-      await db.notes.bulkDelete(doomed);
-      return {
-        ok: true,
-        removedNoteCount: doomed.length,
-        movedNoteCount: 0,
-        removedReferenceCount: references.length,
-      };
-    }
-
-    // keep-children: promote the direct children to the deleted note's parent.
+    // keep-children: promote the direct children into the note's own place.
     const newParentId = note.parentNoteId;
-    const remaining = notes.filter((candidate) => !doomed.includes(candidate.id));
-    const baseOrder = nextNoteSortOrder(remaining, newParentId);
+    const baseOrder = nextNoteSortOrder(
+      notes.filter((candidate) => candidate.id !== id),
+      newParentId,
+    );
     const children = notes
       .filter((candidate) => candidate.parentNoteId === id)
       .sort((a, b) => (a.sortOrder !== b.sortOrder ? a.sortOrder - b.sortOrder : a.title.localeCompare(b.title)));
@@ -345,21 +337,24 @@ export async function deleteNote(id: string, strategy: NoteDeleteStrategy): Prom
         db.notes.update(child.id, { parentNoteId: newParentId, sortOrder: baseOrder + index, updatedAt: now }),
       ),
     );
-    await db.notes.delete(id);
-
-    return {
-      ok: true,
-      removedNoteCount: 1,
-      movedNoteCount: children.length,
-      removedReferenceCount: references.filter((reference) => reference.noteId === id).length,
-    };
+    return { ok: true, movedNoteCount: children.length };
   });
 
-  // `keep-children` promotes subnotes to the deleted note's parent, which may
-  // mean they leave a locked region and must be opened again. Reconciling after
-  // the transaction commits keeps the two consistent without a second code path.
-  if (result.ok) await reconcileProtection();
-  return result;
+  if (!result.ok) {
+    return { ok: false, removedNoteCount: 0, movedNoteCount: 0, removedReferenceCount: 0 };
+  }
+
+  const impact = await trashNote(id, 'keep-children');
+  if (impact.notes === 0) {
+    return { ok: false, removedNoteCount: 0, movedNoteCount: result.movedNoteCount, removedReferenceCount: 0 };
+  }
+
+  return {
+    ok: true,
+    removedNoteCount: 1,
+    movedNoteCount: result.movedNoteCount,
+    removedReferenceCount: 0,
+  };
 }
 
 // ---------------------------------------------------------------------------

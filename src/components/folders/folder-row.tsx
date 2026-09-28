@@ -4,6 +4,7 @@ import * as React from 'react';
 import { ChevronRight, Lock, MoreHorizontal, Star } from 'lucide-react';
 import type { Folder } from '@/db/types';
 import { pluralize } from '@/lib/format';
+import { useLongPress } from '@/hooks/use-long-press';
 import { useVaultStore } from '@/stores/vault-store';
 import { cn } from '@/lib/utils';
 import { Icon, isIconName } from '@/components/ui/icon';
@@ -30,6 +31,9 @@ export function FolderRow({
   className,
 }: FolderRowProps) {
   const locked = useVaultStore((state) => state.protection.folders.has(folder.id));
+  // Hold a folder for the same sheet its ⋯ button opens, so every list in the
+  // app answers to the same gesture.
+  const { handlers, consumeLongPress } = useLongPress(onShowActions);
   const meta: string[] = [];
   if (linkCount > 0) meta.push(pluralize(linkCount, 'link'));
   if (childCount > 0) meta.push(pluralize(childCount, 'folder'));
@@ -38,7 +42,11 @@ export function FolderRow({
     <div className={cn('flex items-stretch gap-1 rounded-xl', className)}>
       <button
         type="button"
-        onClick={onOpen}
+        onClick={() => {
+          if (consumeLongPress()) return;
+          onOpen();
+        }}
+        {...handlers}
         className="tap flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-left active:bg-surface-2"
       >
         <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-muted">

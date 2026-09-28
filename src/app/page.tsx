@@ -3,33 +3,47 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FolderPlus, Inbox, Share2, Sparkles, Star } from 'lucide-react';
-import type { Folder, SavedLink } from '@/db/types';
+import { FolderPlus, Inbox as InboxIcon, Share2, Sparkles, Star, Tag as TagIcon } from 'lucide-react';
+import type { Folder, Note, SavedLink } from '@/db/types';
 import { childrenOf } from '@/lib/tree';
 import { pluralize } from '@/lib/format';
 import { openExternal } from '@/lib/open-external';
-import { useVaultStore } from '@/stores/vault-store';
+import {
+  useVaultStore,
+  selectFavoriteFolders,
+  selectFavoriteNotes,
+  selectInboxLinks,
+  selectTagUsage,
+} from '@/stores/vault-store';
 import { Button } from '@/components/ui/button';
 import { EmptyState, ListSurface, PageHeader, PageTitle, Section } from '@/components/ui/page';
 import { LinkRow } from '@/components/links/link-row';
 import { LinkActionsSheet } from '@/components/links/link-actions-sheet';
 import { FolderRow } from '@/components/folders/folder-row';
 import { FolderActionsSheet } from '@/components/folders/folder-actions-sheet';
+import { NoteRow } from '@/components/notes/note-row';
+import { NoteActionsSheet } from '@/components/notes/note-actions-sheet';
 
 /**
- * Home answers exactly two questions: what did I save lately, and where do I
- * want to go? No counters-as-dashboard, no streaks, no analytics.
+ * Home answers exactly three questions, in the order they are usually asked:
+ * what is still waiting for me, what did I save lately, and where do I want to
+ * go? No counters-as-dashboard, no streaks, no scores.
  */
 export default function HomePage() {
   const router = useRouter();
   const folders = useVaultStore((state) => state.folders);
   const links = useVaultStore((state) => state.links);
   const folderStats = useVaultStore((state) => state.folderStats);
+  const inbox = useVaultStore(selectInboxLinks);
+  const favoriteFolders = useVaultStore(selectFavoriteFolders);
+  const favoriteNotes = useVaultStore(selectFavoriteNotes);
+  const tags = useVaultStore(selectTagUsage);
   const toggleLinkFavorite = useVaultStore((state) => state.toggleLinkFavorite);
   const markLinkOpened = useVaultStore((state) => state.markLinkOpened);
 
   const [activeLink, setActiveLink] = React.useState<SavedLink | null>(null);
   const [activeFolder, setActiveFolder] = React.useState<Folder | null>(null);
+  const [activeNote, setActiveNote] = React.useState<Note | null>(null);
 
   const activeLinks = React.useMemo(() => links.filter((link) => !link.isArchived), [links]);
   const recent = React.useMemo(
@@ -41,7 +55,6 @@ export default function HomePage() {
     [activeLinks],
   );
   const roots = React.useMemo(() => childrenOf(folders, null), [folders]);
-  const favoriteFolders = React.useMemo(() => folders.filter((folder) => folder.isFavorite), [folders]);
   const isEmpty = activeLinks.length === 0 && folders.length === 0;
 
   const openLink = React.useCallback(
@@ -66,12 +79,42 @@ export default function HomePage() {
         </PageTitle>
       </PageHeader>
 
+      {/*
+        The Inbox comes first, before anything saved, because it is the only part
+        of Home that is asking for something. Everything below it is a list of
+        things already dealt with.
+      */}
+      {!isEmpty && inbox.length > 0 ? (
+        <Section title="Inbox" action="Organize" actionHref="/inbox" className="mt-3">
+          <div className="px-4">
+            <Link
+              href="/inbox"
+              className="tap flex items-center gap-3 rounded-xl border border-accent/30 bg-accent-soft px-3.5 py-3 active:opacity-90"
+            >
+              <InboxIcon size={19} strokeWidth={1.9} className="shrink-0 text-accent" aria-hidden />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[0.9375rem] font-semibold text-accent">
+                  {pluralize(inbox.length, 'link')} waiting to be organized
+                </span>
+                <span className="mt-0.5 block truncate text-xs text-accent/80">
+                  {inbox
+                    .slice(0, 2)
+                    .map((link) => link.title?.trim() || link.source || link.url)
+                    .join(' · ')}
+                  {inbox.length > 2 ? ` +${inbox.length - 2} more` : ''}
+                </span>
+              </span>
+            </Link>
+          </div>
+        </Section>
+      ) : null}
+
       {isEmpty ? (
         <div className="px-4 pt-6">
           <EmptyState
             icon={<Sparkles size={22} strokeWidth={1.7} />}
-            title="Start by saving something"
-            description="Share a link to Stash from any app, or add one by hand with the + button. Everything stays on this device."
+            title="Save something worth coming back to."
+            description="Share a link to Stash from any app, or add one by hand with the + button. Nothing has to be filed, named or sorted — it goes to the Inbox and waits. Everything stays on this device."
           />
           <div className="mx-auto mt-2 max-w-sm rounded-2xl border border-border bg-surface p-4">
             <p className="flex items-center gap-2 text-[0.9375rem] font-semibold text-fg">
@@ -130,7 +173,7 @@ export default function HomePage() {
             </Section>
           ) : null}
 
-          {favorites.length > 0 ? (
+          {favorites.length > 0 || favoriteNotes.length > 0 ? (
             <Section title="Favorites" action="All favorites" actionHref="/search?filter=favorites">
               <ListSurface>
                 {favorites.map((link) => (
@@ -143,7 +186,33 @@ export default function HomePage() {
                     onShowActions={() => setActiveLink(link)}
                   />
                 ))}
+                {favoriteNotes.slice(0, 2).map((note) => (
+                  <NoteRow
+                    key={note.id}
+                    note={note}
+                    onOpen={() => router.push(`/notes?note=${note.id}`)}
+                    onShowActions={() => setActiveNote(note)}
+                  />
+                ))}
               </ListSurface>
+            </Section>
+          ) : null}
+
+          {tags.length > 0 ? (
+            <Section title="Tags" action="Search" actionHref="/search">
+              <div className="-mx-0 flex gap-1.5 overflow-x-auto px-4 pb-1 no-scrollbar">
+                {tags.slice(0, 12).map((tag) => (
+                  <Link
+                    key={tag.name}
+                    href={`/search?q=${encodeURIComponent(tag.name)}`}
+                    className="tap flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 active:bg-surface-2"
+                  >
+                    <TagIcon size={12} strokeWidth={2.2} className="text-subtle" aria-hidden />
+                    <span className="text-[0.8125rem] font-medium text-fg">{tag.name}</span>
+                    <span className="text-[0.6875rem] text-subtle">{tag.count}</span>
+                  </Link>
+                ))}
+              </div>
             </Section>
           ) : null}
 
@@ -179,12 +248,21 @@ export default function HomePage() {
               </div>
             )}
 
-            <div className="px-4 pt-2">
+            <div className="flex flex-col gap-2 px-4 pt-2">
+              <Link
+                href="/inbox"
+                className="tap flex items-center gap-2 rounded-xl border border-dashed border-border-strong px-3 py-2.5 text-[0.875rem] font-medium text-accent active:bg-surface-2"
+              >
+                <InboxIcon size={16} strokeWidth={1.9} aria-hidden />
+                {inbox.length > 0
+                  ? `Inbox · ${pluralize(inbox.length, 'link')} to organize`
+                  : 'Inbox · nothing waiting'}
+              </Link>
               <Link
                 href="/library"
                 className="tap flex items-center gap-2 rounded-xl border border-dashed border-border-strong px-3 py-2.5 text-[0.875rem] font-medium text-accent active:bg-surface-2"
               >
-                <Inbox size={16} strokeWidth={1.9} aria-hidden />
+                <FolderPlus size={16} strokeWidth={1.9} aria-hidden />
                 Open the full folder tree
               </Link>
             </div>
@@ -201,6 +279,12 @@ export default function HomePage() {
         key={activeFolder?.id ?? 'no-folder'}
         folder={activeFolder}
         onClose={() => setActiveFolder(null)}
+      />
+      <NoteActionsSheet
+        key={activeNote?.id ?? 'no-note'}
+        note={activeNote}
+        onClose={() => setActiveNote(null)}
+        onOpenNote={(id) => router.push(`/notes?note=${id}`)}
       />
     </>
   );

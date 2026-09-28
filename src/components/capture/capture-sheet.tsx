@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Check, Copy, FolderPlus, Loader2, Plus, Share2, X } from 'lucide-react';
+import { Check, Copy, FolderPlus, Inbox, Loader2, Plus, Share2, X } from 'lucide-react';
 import type { Folder } from '@/db/types';
 import { destinationLabel } from '@/lib/destination';
 import { isHttpUrl } from '@/lib/url/normalize';
@@ -65,6 +65,7 @@ export function CaptureSheet() {
   const url = draft?.url.trim() ?? '';
   const validUrl = isHttpUrl(url);
   const duplicatePending = duplicates.length > 0 && !duplicateAcknowledged;
+  const inInbox = destination.kind === 'inbox';
 
   const handleSave = React.useCallback(async () => {
     setError(null);
@@ -88,7 +89,7 @@ export function CaptureSheet() {
               action: {
                 label: 'Undo',
                 onSelect: () => {
-                  void useVaultStore.getState().deleteLink(link.id);
+                  void useVaultStore.getState().discardLink(link.id);
                 },
               },
             }
@@ -102,6 +103,43 @@ export function CaptureSheet() {
       urlInputRef.current?.focus();
     }
   }, [duplicatePending, folders]);
+
+  /**
+   * One tap, no folder decision.
+   *
+   * The duplicate notice still applies: saving the same address twice is worth
+   * saying out loud even when the user is in a hurry, and the notice is on screen
+   * rather than a modal, so it costs nothing to dismiss by saving anyway.
+   */
+  const handleSaveToInbox = React.useCallback(async () => {
+    setError(null);
+    if (duplicatePending) useCaptureStore.getState().acknowledgeDuplicate();
+
+    const outcome = await useCaptureStore.getState().saveToInbox();
+    if (outcome.ok) {
+      const link = outcome.link;
+      toast('Saved to Inbox', {
+        tone: 'success',
+        description: 'No folder yet — file it whenever you like.',
+        duration: link ? 6500 : 2600,
+        ...(link
+          ? {
+              action: {
+                label: 'Undo',
+                onSelect: () => {
+                  void useVaultStore.getState().discardLink(link.id);
+                },
+              },
+            }
+          : {}),
+      });
+      return;
+    }
+    if (outcome.reason === 'invalid-url') {
+      setError('That does not look like a web address. Check it and try again.');
+      urlInputRef.current?.focus();
+    }
+  }, [duplicatePending]);
 
   const handleMoveExisting = React.useCallback(
     async (linkId: string) => {
@@ -248,7 +286,7 @@ export function CaptureSheet() {
                 size="lg"
                 className="w-full"
                 disabled={!validUrl || status === 'saving'}
-                onClick={() => void handleSave()}
+                onClick={() => void (inInbox ? handleSaveToInbox() : handleSave())}
               >
                 {status === 'saving' ? (
                   <>
@@ -257,16 +295,51 @@ export function CaptureSheet() {
                   </>
                 ) : (
                   <>
-                    <Check size={19} strokeWidth={2.5} aria-hidden />
-                    {duplicatePending ? 'Save another copy' : 'Save'}
+                    {inInbox ? (
+                      <Inbox size={19} strokeWidth={2.4} aria-hidden />
+                    ) : (
+                      <Check size={19} strokeWidth={2.5} aria-hidden />
+                    )}
+                    {inInbox
+                      ? 'Save to Inbox'
+                      : duplicatePending
+                        ? 'Save another copy'
+                        : 'Save'}
                   </>
                 )}
               </Button>
+
+              {/*
+                The hurried path, always visible and never more than one tap
+                away. Shown only when the destination is somewhere else, because
+                when the destination *is* the Inbox the primary button above is
+                already this exact action, and two buttons doing the same thing
+                is a decision where there should be none.
+              */}
+              {!inInbox ? (
+                <Button
+                  variant="surface"
+                  size="lg"
+                  className="mt-2 w-full"
+                  disabled={!validUrl || status === 'saving'}
+                  onClick={() => void handleSaveToInbox()}
+                >
+                  <Inbox size={19} strokeWidth={2} aria-hidden />
+                  Save to Inbox
+                </Button>
+              ) : null}
+
               <p className="mt-2 truncate text-center text-xs text-subtle">
-                to <span className="font-medium text-muted">{destinationLabel(destination, folders)}</span>
-                {draft && saveOtherUrls && draft.otherUrls.length > 0
-                  ? ` · ${draft.otherUrls.length + 1} links`
-                  : ''}
+                {inInbox ? (
+                  'No folder yet — organize it later'
+                ) : (
+                  <>
+                    to <span className="font-medium text-muted">{destinationLabel(destination, folders)}</span>
+                    {draft && saveOtherUrls && draft.otherUrls.length > 0
+                      ? ` · ${draft.otherUrls.length + 1} links`
+                      : ''}
+                  </>
+                )}
               </p>
             </>
           )}
