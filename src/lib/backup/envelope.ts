@@ -15,16 +15,16 @@ import { invalid, problemMessage, type ParseResult, validateBackupData } from '.
  * The encrypted backup envelope.
  *
  * A backup file can itself be encrypted, under a passphrase the user chooses for
- * that file. This is separate from the vault passcode on purpose, and the
- * separation is worth stating plainly because it is the part users get wrong:
+ * that file. This passphrase is the only secret involved in a backup, and it is
+ * worth stating plainly what it is not:
  *
- *  - The **vault passcode** protects locked items *on the device*. It is the key
- *    to the keyring, and it never travels anywhere.
+ *  - The **device lock** protects locked items *on the device*. It is what
+ *    unwraps the keyring, and it never travels anywhere — a key wrapped for one
+ *    device cannot be unwrapped on another.
  *  - The **backup passphrase** protects *this file*, wherever it ends up. It is
  *    chosen at export time, told to nobody, and needed only to restore.
  *
- * They are allowed to be the same string, but nothing requires it, and neither
- * one reveals the other. Choosing `encrypted` is how a backup becomes safe to
+ * They are independent, and neither reveals the other. Choosing `encrypted` is how a backup becomes safe to
  * put in cloud storage or send to yourself without exposing anything — including
  * unlocked content, which the other two modes leave readable.
  *
@@ -36,13 +36,15 @@ import { invalid, problemMessage, type ParseResult, validateBackupData } from '.
  *
  *  - There is no recovery code and no escrow. A forgotten backup passphrase
  *    means the file cannot be read, by us or by anyone.
- *  - A *sealed* backup (the default) needs no passphrase to open, but its locked
- *    items still need the original Stash passcode. Encrypting it with a backup
- *    passphrase protects everything at rest, and the Stash passcode is still
- *    required for the locked parts after restoring.
+ *  - A *sealed* backup (the default) needs no passphrase to open, and it copies
+ *    the locked rows as ciphertext. Whether those can be read after a restore
+ *    depends on the key: a vault that still carries a legacy passcode wrap
+ *    travels with it, while a vault locked by the device prompt alone has no
+ *    portable key, so its locked items open only on the device that wrote the
+ *    file. The export screen says which of the two is being written.
  */
 
-/** A passphrase for a file, distinct from the vault passcode. */
+/** A passphrase for a file. Nothing else in the app uses a passphrase. */
 export const MIN_BACKUP_PASSPHRASE = 8;
 
 export interface BackupEnvelope {

@@ -388,7 +388,7 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
                 }
                 onClick={() => {
                   if (!keyringPresent) {
-                    toast('Set a Stash passcode first', { tone: 'danger' });
+                    toast('Turn on locking first', { tone: 'danger' });
                     close();
                     router.push('/settings');
                     return;

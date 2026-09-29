@@ -88,7 +88,7 @@ function PassphraseView() {
       <SheetHeader>
         <SheetTitle>This backup is encrypted</SheetTitle>
         <p className="mt-1 text-body text-muted">
-          {pending.fileName} is protected by a passphrase, which is separate from your Stash passcode.
+          {pending.fileName} is protected by its own passphrase — it says nothing about the vault on this device.
         </p>
       </SheetHeader>
 
@@ -257,9 +257,9 @@ function ReviewView() {
             <Notice tone="danger">
               <span className="flex items-start gap-2">
                 <ShieldAlert size={14} strokeWidth={2} className="mt-0.5 shrink-0" aria-hidden />
-                This backup brings its own key. After restoring, your current Stash passcode will no longer open
-                this vault — the passcode from the device that wrote this file will. Unlock with it straight
-                afterwards.
+                This backup brings its own key, from a vault that still used a passcode. After restoring, this
+                device&apos;s lock will no longer open the vault — the passcode from the device that wrote this file
+                will. Unlock with it straight afterwards.
               </span>
             </Notice>
           ) : null}
@@ -267,7 +267,8 @@ function ReviewView() {
           {plan?.keyring === 'adopt' && !plan.replacesKeyring ? (
             <Notice tone="neutral">
               The backup’s key will be installed, so its locked items open with the passcode from the device that
-              wrote the file.
+              wrote the file. Nothing writes a passcode any more, so this only happens for a backup taken by an
+              older build.
             </Notice>
           ) : null}
 
@@ -366,7 +367,7 @@ function DoneView({ onClose }: { onClose: () => void }) {
               {result.keyringReplaced ? (
                 <Notice tone="warn">
                   The backup’s key replaced the one on this device, so the vault has been locked. Unlock with the
-                  passcode from the device that wrote this file.
+                  passcode from the device that wrote this file — the only case in which Stash asks for one.
                 </Notice>
               ) : null}
 

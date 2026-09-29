@@ -376,7 +376,7 @@ export function FolderActionsSheet({ folder, onClose, onDeleted }: FolderActions
                 }
                 onClick={() => {
                   if (!keyringPresent) {
-                    toast('Set a Stash passcode first', { tone: 'danger' });
+                    toast('Turn on locking first', { tone: 'danger' });
                     close();
                     router.push('/settings');
                     return;
@@ -446,7 +446,8 @@ export function FolderActionsSheet({ folder, onClose, onDeleted }: FolderActions
               {!moveCheck.ok ? <p className="text-label px-4 pb-3 text-subtle">{moveCheck.reason}</p> : null}
               {!keyringPresent ? (
                 <p className="text-label px-4 pb-3 leading-relaxed text-subtle">
-                  Locking encrypts a folder and everything inside it. Set a passcode in Settings to turn it on.
+                  Locking encrypts a folder and everything inside it. Turn it on in Settings with your device
+                  lock.
                 </p>
               ) : null}
             </ActionList>

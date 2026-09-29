@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
@@ -98,25 +98,3 @@ export function PasscodeInput({
   );
 }
 
-/** What the passcode protects, said plainly wherever one is being set. */
-export function PasscodeReassurance({ className }: { className?: string }) {
-  return (
-    <p className={cn('flex items-start gap-2 text-meta leading-relaxed text-subtle', className)}>
-      <ShieldCheck size={14} strokeWidth={2} className="mt-0.5 shrink-0 text-accent" aria-hidden />
-      <span>
-        Stash encrypts locked items with a key stored on this device, unlocked by your passcode. There is no
-        account and no server, and nothing can recover the passcode — not a support team, not us.
-      </span>
-    </p>
-  );
-}
-
-export const MIN_PASSCODE_LENGTH = 6;
-
-export function validateNewPasscode(passcode: string, confirmation: string): string | null {
-  if (passcode.trim().length < MIN_PASSCODE_LENGTH) {
-    return `Use at least ${MIN_PASSCODE_LENGTH} characters.`;
-  }
-  if (passcode !== confirmation) return 'The two passcodes do not match.';
-  return null;
-}

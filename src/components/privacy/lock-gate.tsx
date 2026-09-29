@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Fingerprint, KeyRound, Loader2, Lock, LockKeyhole, Unlock } from 'lucide-react';
+import { Fingerprint, Loader2, Lock, LockKeyhole, Unlock } from 'lucide-react';
 import { devicePromptName, devicePromptTitle } from '@/lib/privacy/auth';
 import { usePrivacyStore } from '@/stores/privacy-store';
 import { useVaultStore } from '@/stores/vault-store';
@@ -17,12 +17,16 @@ import { PasscodeInput } from './passcode-input';
  * is ciphertext and its key is not in memory, so the items are unreadable
  * whether this gate is shown or not.
  *
- * The order of the two ways in matters. The device prompt comes first and runs
- * by itself, because that is the whole point of setting locking up this way:
- * there is nothing to remember, nothing to type, and no password to invent.
- * The Stash passcode sits underneath it, behind one tap, for the cases where the
- * prompt is unavailable or the device key is gone — and it is the only way in at
- * all on a vault that has a passcode but no armed device key.
+ * There is one way in: the system prompt. It runs by itself on arrival, because
+ * that is the whole point of setting locking up this way — nothing to remember,
+ * nothing to type, no password to invent, and therefore nothing to forget. Stash
+ * keeps no passcode of its own, so a person who cannot pass that prompt does not
+ * see the locked items, which is the intended outcome rather than a shortcoming.
+ *
+ * One branch survives for a vault made by an earlier build whose only wrap was a
+ * passcode: that vault has no other key in existence, and asking for the passcode
+ * is the difference between opening it and destroying access to it. The field is
+ * never offered for anything else and nothing writes a passcode any more.
  */
 
 export function LockGate() {
@@ -45,8 +49,6 @@ export function LockGate() {
 
   const [passcode, setPasscode] = React.useState('');
   const [skipped, setSkipped] = React.useState(false);
-  // Revealed when there is no device path to offer, or when the user asks.
-  const [showPasscode, setShowPasscode] = React.useState(false);
 
   // Two reasons to cover the screen: locking is configured to cover the app, or
   // the user just tapped a locked item. The second one matters when locking is
@@ -54,7 +56,9 @@ export function LockGate() {
   const blocking =
     ready && keyringPresent && !unlocked && (revealRequest !== null || (settings.lockApp !== false && !skipped));
   const devicePath = deviceAuthAvailable && deviceUnlockReady;
-  const passcodeFieldVisible = showPasscode || !devicePath;
+  /** A vault from an older build whose only key is a passcode: nothing else can open it. */
+  const legacyPasscodeOnly = passcodeSet && !devicePath;
+  const passcodeFieldVisible = legacyPasscodeOnly;
 
   /**
    * Prompt on arrival.
@@ -104,10 +108,18 @@ export function LockGate() {
         </h1>
         <p className="mt-1.5 max-w-xs text-meta leading-relaxed text-muted">
           {revealRequest
-            ? `Unlock to open it. ${devicePath ? `${devicePromptName(deviceStoreKind)} will ask for you.` : 'Your passcode opens it.'}`
+            ? `Unlock to open it. ${
+                devicePath
+                  ? `${devicePromptName(deviceStoreKind)} will ask for you.`
+                  : legacyPasscodeOnly
+                    ? 'This vault opens with the passcode it was created with.'
+                    : 'This device cannot prompt for it right now.'
+              }`
             : devicePath
               ? `Unlock with ${devicePromptName(deviceStoreKind)}. Nothing else is shown until you do.`
-              : 'Locked notes, links and folders stay encrypted until you unlock. Everything else is on this device as usual.'}
+              : legacyPasscodeOnly
+                ? 'Locked notes, links and folders stay encrypted until you unlock. Everything else is on this device as usual.'
+                : 'Locked items stay encrypted, and this device cannot prompt for them — so they cannot be opened here. Everything else is on this device as usual.'}
         </p>
       </div>
 
@@ -137,22 +149,18 @@ export function LockGate() {
       {passcodeFieldVisible ? (
         <div className="w-full max-w-xs">
           <PasscodeInput
-            label="Stash passcode"
+            label="Passcode"
             value={passcode}
             onChange={setPasscode}
             onSubmit={() => void submit()}
-            autoFocus={!devicePath}
+            autoFocus
             disabled={busy}
             tone={message ? 'danger' : 'default'}
             hint={
-              devicePath ? (
-                <span>The passcode you set beside the device lock.</span>
-              ) : (
-                <span>
-                  Your vault key is unlocked by this passcode. There is no reset — nobody, including us, can recover
-                  it.
-                </span>
-              )
+              <span>
+                This vault was created with a passcode, and its key is wrapped by that passcode alone — there is no
+                device key to ask. Nothing can reset it, including us.
+              </span>
             }
           />
           <Button
@@ -170,18 +178,11 @@ export function LockGate() {
             Unlock
           </Button>
         </div>
-      ) : passcodeSet ? (
-        <button
-          type="button"
-          onClick={() => setShowPasscode(true)}
-          className="tap flex items-center gap-1.5 rounded-xl px-3 py-2 text-meta font-medium text-accent active:bg-accent-soft"
-        >
-          <KeyRound size={15} strokeWidth={2} aria-hidden />
-          Use your Stash passcode
-        </button>
       ) : (
         <p className="max-w-xs text-center text-meta leading-relaxed text-subtle">
-          This vault was set up with the device lock only, so there is no passcode to fall back on.
+          {devicePath
+            ? 'Your device lock is the only way in, and Stash keeps no passcode of its own to fall back on.'
+            : 'This device cannot show its lock prompt right now. Set up a screen lock or Windows Hello, then reopen Stash.'}
         </p>
       )}
 
@@ -202,9 +203,11 @@ export function LockGate() {
         <LockKeyhole size={13} strokeWidth={2} aria-hidden />
         {/* Says which ways in exist, not which ways were configured once: an armed
             device key on a machine that can no longer prompt is not a way in. */}
-        {[passcodeSet ? 'Passcode set' : null, devicePath ? 'device prompt ready' : null]
-          .filter(Boolean)
-          .join(' · ') || 'No passcode — device lock only'}
+        {devicePath
+          ? 'Device prompt ready'
+          : legacyPasscodeOnly
+            ? 'Passcode this vault was created with'
+            : 'No way in on this device'}
       </p>
     </div>
   );

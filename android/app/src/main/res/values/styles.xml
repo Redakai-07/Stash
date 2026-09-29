@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+    <!--
+        Android theme roles.
+
+        The app draws every pixel of its own interface, so all three themes here
+        exist to answer one question: what does the window look like in the
+        moments before and around the WebView's own paint? They must never add
+        chrome of their own — no title bar, no action bar, no splash image that
+        can outlive its launch.
+    -->
+
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
         <!-- Customize your theme here. -->
@@ -12,11 +22,60 @@
     <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
-        <item name="android:background">@null</item>
+
+        <!--
+            Both spellings, both as a concrete colour.
+
+            `android:background` here used to be `@null`, meaning "paint nothing"
+            — and with the window edge to edge, "nothing" is not the app's
+            background, it is whatever the window was created with. On a cold
+            start that is the launch theme, so a strip of the launch surface
+            could show above or below the app's own content. Stating the colour
+            twice removes the ambiguity: the window is this colour, always.
+        -->
+        <item name="android:background">@color/stash_window_background</item>
+        <item name="android:windowBackground">@color/stash_window_background</item>
     </style>
 
+    <!--
+        The theme the activity is launched with.
 
+        `windowActionBar` / `windowNoTitle` are also inherited from
+        `Theme.SplashScreen`, and are repeated here on purpose: AppCompat decides
+        whether to install an ActionBar from the theme that is current at the
+        moment the window's decor is first inflated, which — because this theme
+        is the one the manifest names — can happen before Capacitor swaps in
+        `AppTheme.NoActionBar` a few lines into `onCreate`. An ActionBar installed
+        at that moment is titled with the activity label ("Stash") and is not
+        removed by the swap, which is exactly the failure it looks like: the app
+        name in a bar above the app's own content.
+    -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+
+        <!--
+            A flat colour, not `@drawable/splash`.
+
+            The drawable was the window background for the whole session, so on a
+            device or WebView where a band of the window is not covered by the
+            WebView, that band showed a scaled copy of the splash image across
+            the top of the app. The image is gone from the theme: what remains is
+            the same colour the app would have painted itself.
+
+            The Android 12+ system splash screen is unaffected by this — it is
+            configured by the two items below and still shows the app icon, now on
+            the app's own background instead of a white one.
+        -->
+        <item name="android:background">@color/stash_window_background</item>
+        <item name="android:windowBackground">@color/stash_window_background</item>
+        <item name="windowSplashScreenBackground">@color/stash_window_background</item>
+
+        <!-- What the window becomes once the splash is over, if anything ever
+             asks Android to install it (the plugin that ships with Capacitor does
+             not, but the theme is the documented place to say it). -->
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>

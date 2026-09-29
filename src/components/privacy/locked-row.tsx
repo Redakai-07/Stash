@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
  * accident.
  *
  * Tapping asks the same question the lock screen does: the device prompt where
- * one is armed, and the passcode where it is not. That is the point of keeping
+ * one is armed, and (for a vault made by an older build) the passcode where it is not. That is the point of keeping
  * the row rather than filtering it out.
  */
 

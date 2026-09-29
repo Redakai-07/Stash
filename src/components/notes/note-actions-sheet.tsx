@@ -317,7 +317,7 @@ export function NoteActionsSheet({ note, onClose, onOpenNote, onDeleted }: NoteA
                 }
                 onClick={() => {
                   if (!keyringPresent) {
-                    toast('Set a Stash passcode first', { tone: 'danger' });
+                    toast('Turn on locking first', { tone: 'danger' });
                     close();
                     router.push('/settings');
                     return;
@@ -347,8 +347,8 @@ export function NoteActionsSheet({ note, onClose, onOpenNote, onDeleted }: NoteA
               />
               {!keyringPresent ? (
                 <p className="px-2 pt-1 text-meta leading-relaxed text-subtle">
-                  Locking encrypts a note and its subnotes so they are unreadable while Stash is locked. Set a
-                  passcode in Settings to turn it on.
+                  Locking encrypts a note and its subnotes so they are unreadable while Stash is locked. Turn it on
+                  in Settings with your device lock.
                 </p>
               ) : null}
               {resourceCount > 0 ? (

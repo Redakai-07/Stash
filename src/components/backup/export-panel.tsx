@@ -130,8 +130,8 @@ export function ExportPanel() {
             aria-label="Confirm backup passphrase"
           />
           <p className="px-1 text-meta leading-relaxed text-subtle">
-            This passphrase protects the file itself, and is separate from your Stash passcode. There is no
-            recovery code: if it is lost, the file cannot be opened again — not by you, and not by Stash.
+            This passphrase protects the file itself, and nothing else. There is no recovery code: if it is lost,
+            the file cannot be opened again — not by you, and not by Stash.
           </p>
         </div>
       ) : null}
@@ -139,8 +139,9 @@ export function ExportPanel() {
       {chosen?.id === 'sealed' && lockedCount > 0 ? (
         <p className="flex items-start gap-2 px-1 text-meta leading-relaxed text-subtle">
           <ShieldCheck size={14} strokeWidth={2} className="mt-0.5 shrink-0" aria-hidden />
-          {lockedCount} locked item(s) stay encrypted in the file, along with the wrapped key that opens them.
-          Restoring them anywhere needs your Stash passcode — so keep the file and the passcode separately.
+          {lockedCount} locked item(s) stay encrypted in the file. A vault that still carries a passcode wrap
+          travels with it, so a restore can open them; a vault locked with the device prompt alone has no key to
+          hand over, and those items can only be opened on the device that wrote this file.
         </p>
       ) : null}
 

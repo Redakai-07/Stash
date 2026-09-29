@@ -5,9 +5,6 @@ import { DEFAULT_PRIVACY_SETTINGS, type PrivacySettings } from '@/db/types';
 import { getPrivacySettings, setPrivacySettings } from '@/db/repos/settings';
 import { getDeviceAuthenticator } from '@/lib/privacy/auth';
 import {
-  addPasscode as addPasscodeRepo,
-  changePasscode as changePasscodeRepo,
-  createKeyring,
   createKeyringWithDevice,
   destroyKeyring,
   disableDeviceUnlock,
@@ -93,21 +90,24 @@ export interface PrivacyState {
   reload: () => Promise<void>;
   /** Re-read capabilities after they could have changed (resume, settings). */
   refreshCapabilities: () => Promise<void>;
-  createPasscode: (passcode: string) => Promise<ActionResult>;
   /**
-   * Set up locking with the device prompt only — no passcode to invent.
-   * Refuses when this platform cannot prompt, rather than locking the vault with
-   * no way in.
+   * Set up locking with the device prompt. The only setup there is: Stash keeps
+   * no passcode of its own, so this refuses when the platform cannot prompt
+   * rather than locking the vault with a secret the user has to invent.
    */
   createWithDevice: () => Promise<ActionResult>;
-  /** Add a passcode to a device-locked vault, making it portable again. */
-  addPasscode: (passcode: string) => Promise<ActionResult>;
   /**
-   * Turn privacy off: opens everything, then removes the keyring. On a vault
-   * with no passcode the `passcode` argument is unused and the device prompt is
-   * what authorises the change.
+   * Turn privacy off: opens everything, then removes the keyring. The device
+   * prompt authorises it; `passcode` is read only on a vault created by an older
+   * build whose only wrap was a passcode.
    */
   disable: (passcode: string) => Promise<ActionResult>;
+  /**
+   * Open a vault with a passcode. Kept for vaults created before the device lock
+   * existed: their passcode wrap is the only thing that can open them, and
+   * removing this path would destroy access to content that is otherwise
+   * unrecoverable. Nothing in the app creates a passcode any more.
+   */
   unlock: (passcode: string) => Promise<ActionResult>;
   unlockWithBiometrics: () => Promise<ActionResult>;
   /**
@@ -121,11 +121,11 @@ export interface PrivacyState {
   handleBackground: (now?: number) => void;
   /** Returns true when the policy expired the session on the way back in. */
   handleForeground: (now?: number) => boolean;
-  changePasscode: (current: string, next: string) => Promise<ActionResult>;
   /**
    * Remove the lock without unlocking: the keyring is destroyed and anything
    * sealed stays sealed and permanently unreadable. Offered only as a described,
-   * deliberate last resort so a forgotten passcode cannot brick the app.
+   * deliberate last resort, so a device whose key is gone cannot leave the app
+   * unusable.
    */
   abandonLock: () => Promise<void>;
   armBiometrics: () => Promise<ActionResult>;
@@ -247,36 +247,6 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
     set({ deviceAuthAvailable, deviceUnlockReady: await isDeviceUnlockReady(), passcodeSet, deviceStoreKind });
   },
 
-  createPasscode: async (passcode) => {
-    set({ busy: true });
-    const result = await createKeyring(passcode);
-    if (!result.ok) {
-      set({ busy: false, message: result.message ?? null });
-      return { ok: false, message: result.message };
-    }
-
-    // Offer the device fast path straight away when it can work — that is the
-    // difference between locking being usable and being resented.
-    let deviceUnlockReady = false;
-    if (get().settings.biometric) {
-      const authenticator = await getDeviceAuthenticator();
-      if (await authenticator.isAvailable()) deviceUnlockReady = await enableDeviceUnlock();
-    }
-
-    const settings = await setPrivacySettings({ enabled: true });
-    set({
-      busy: false,
-      settings,
-      keyringPresent: true,
-      passcodeSet: true,
-      deviceUnlockReady,
-      unlocked: true,
-      message: null,
-    });
-    syncScreenPrivacy(settings.secureScreen, true);
-    return { ok: true };
-  },
-
   createWithDevice: async () => {
     set({ busy: true, message: null });
 
@@ -286,7 +256,7 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
     const authenticator = await getDeviceAuthenticator();
     if (!(await authenticator.isAvailable())) {
       const message =
-        'This device cannot prompt for a device unlock yet. Set up a screen lock or Windows Hello, or use a Stash passcode.';
+        'This device cannot prompt for a device unlock yet. Set up a screen lock or Windows Hello, then come back — Stash has no passcode to fall back on.';
       set({ busy: false, message });
       return { ok: false, message };
     }
@@ -320,44 +290,42 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
     return { ok: true };
   },
 
-  addPasscode: async (passcode) => {
-    set({ busy: true, message: null });
-    const result = await addPasscodeRepo(passcode);
-    if (!result.ok) {
-      set({ busy: false, message: result.message ?? null });
-      return { ok: false, message: result.message };
-    }
-    set({ busy: false, passcodeSet: true, message: null });
-    return { ok: true };
-  },
-
   disable: async (passcode) => {
     set({ busy: true, message: null });
 
-    // Verify first: turning privacy off opens everything, and that must not be
-    // something a passer-by can trigger on an unlocked phone. A vault with no
-    // passcode proves presence the same way it opens every other time — with the
-    // device prompt — so there is no path where "turn locking off" is a single
-    // unauthenticated tap.
-    if (!(await hasPasscodeWrap())) {
+    /*
+     * Verify first: turning privacy off opens everything, and that must not be
+     * something a passer-by can trigger on an unlocked phone. The device prompt
+     * goes first because it is the only secret the app has left; a passcode is
+     * accepted only as the fallback for a vault whose device key is gone (one
+     * created by an older build, or restored from a backup onto this device).
+     * There is no path where "turn locking off" is a single unauthenticated tap.
+     */
+    let authorised = false;
+
+    if (await isDeviceUnlockReady()) {
       const authenticator = await getDeviceAuthenticator();
       const outcome = await authenticator.authenticate('Turn off locking for your Stash vault');
       if (!outcome.ok) {
         set({ busy: false, message: outcome.message ?? 'That did not succeed.' });
         return { ok: false, message: outcome.message };
       }
-      const deviceKey = await unlockWithDevice();
-      if (!deviceKey) {
-        const message = 'This device can no longer open the vault. Use a passcode, if one was added.';
-        set({ busy: false, message });
-        return { ok: false, message };
-      }
-    } else {
+      authorised = Boolean(await unlockWithDevice());
+    }
+
+    if (!authorised && (await hasPasscodeWrap())) {
       const key = await unlockWithPasscode(passcode);
       if (!key) {
         set({ busy: false, message: 'That passcode did not match.' });
         return { ok: false, message: 'That passcode did not match.' };
       }
+      authorised = true;
+    }
+
+    if (!authorised) {
+      const message = 'This device can no longer open the vault, so locking cannot be turned off from here.';
+      set({ busy: false, message });
+      return { ok: false, message };
     }
 
     // Open every sealed row before the keyring goes, so nothing is left
@@ -384,7 +352,7 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
     // Asked of the keyring rather than of the cached flag: an import can adopt
     // a keyring underneath us, and the answer that matters is what is on disk.
     if (!(await hasPasscodeWrap())) {
-      const message = 'This vault opens with your device lock. Use that, or add a passcode in Settings.';
+      const message = 'This vault opens with the device lock, not a passcode.';
       set({ busy: false, passcodeSet: false, message });
       return { ok: false, message };
     }
@@ -491,17 +459,11 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
     return true;
   },
 
-  changePasscode: async (current, next) => {
-    set({ busy: true, message: null });
-    const result = await changePasscodeRepo(current, next);
-    set({ busy: false, message: result.ok ? null : (result.message ?? null) });
-    return result;
-  },
-
   abandonLock: async () => {
-    // No unsealing, no verification: this is the path for a forgotten passcode.
-    // Locked items are not deleted — they become ciphertext nobody holds a key
-    // for. That is data loss, which is why the UI says so in those words.
+    // No unsealing, no verification: this is the path for a vault whose key is
+    // unreachable. Locked items are not deleted — they become ciphertext nobody
+    // holds a key for. That is data loss, which is why the UI says so in those
+    // words.
     await destroyKeyring();
     const settings = await setPrivacySettings({ enabled: false });
     set({

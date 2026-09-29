@@ -14,12 +14,13 @@ import {
 import { describeBundleLocks, exportVault, getSnapshot, importVault, isValidBundle } from '@/db/repos/vault';
 import { createStaticAuthenticator, setDeviceAuthenticator } from '@/lib/privacy/auth';
 import {
-  changePasscode,
   createKeyring,
   destroyKeyring,
+  disableDeviceUnlock,
   enableDeviceUnlock,
   forgetVaultKey,
   hasKeyring,
+  isDeviceUnlockReady,
   isSessionLocked,
   readKeyring,
   unlockWithPasscode,
@@ -101,6 +102,28 @@ async function mustLink(url: string, folderId: string | null = null): Promise<st
 async function enablePrivacy(passcode = PASSCODE): Promise<void> {
   const result = await createKeyring(passcode);
   expect(result.ok).toBe(true);
+}
+
+/**
+ * A vault set up the way an older build set one up: a passcode is the only key.
+ *
+ * The app no longer offers this — locking is turned on with the device prompt,
+ * and Stash keeps no passcode of its own — but the shape still matters for two
+ * reasons, both about not losing data: an existing user's vault looks like this,
+ * and a backup written by an older build adopts exactly this keyring. So the
+ * passcode paths stay exercised here even though nothing creates one.
+ */
+async function enableLegacyPasscodeVault(passcode = PASSCODE): Promise<void> {
+  await enablePrivacy(passcode);
+  const settings = await setPrivacySettings({ enabled: true });
+  usePrivacyStore.setState({
+    settings,
+    keyringPresent: true,
+    passcodeSet: true,
+    deviceUnlockReady: false,
+    unlocked: true,
+    message: null,
+  });
 }
 
 describe('locking a note', () => {
@@ -399,28 +422,29 @@ describe('session', () => {
     expect((await getSnapshot()).notes.find((note) => note.id === id)?.title).toBe('Therapy');
   });
 
-  it('re-wraps the key when the passcode changes, without re-encrypting anything', async () => {
+  it('adds a device wrap beside a legacy passcode wrap without re-encrypting anything', async () => {
     await enablePrivacy();
     const id = await mustNote('Therapy');
     await setNoteLocked(id, true);
+    const sealed = (await db.notes.get(id))?.content;
     const before = (await readKeyring())?.wrappedByPasscode?.ct;
 
-    expect(await changePasscode('not the passcode', 'next one')).toMatchObject({ ok: false });
-    expect((await readKeyring())?.wrappedByPasscode?.ct).toBe(before);
+    setDeviceAuthenticator(createStaticAuthenticator({ ok: true }, { available: true }));
+    setSecureStore(memorySecureStore());
+    expect(await enableDeviceUnlock()).toBe(true);
 
-    expect(await changePasscode(PASSCODE, 'a better passcode')).toMatchObject({ ok: true });
+    // Two ways in, one key: the passcode wrap is untouched, and the sealed row is
+    // the same ciphertext it was before.
+    expect((await readKeyring())?.wrappedByPasscode?.ct).toBe(before);
     forgetVaultKey();
-    expect(await unlockWithPasscode(PASSCODE)).toBeNull();
-    expect(await unlockWithPasscode('a better passcode')).not.toBeNull();
-    // Same ciphertext for the content: only the wrapping changed.
-    expect(isSealed((await db.notes.get(id)) ?? {})).toBe(true);
+    expect(await unlockWithPasscode(PASSCODE)).not.toBeNull();
+    expect((await db.notes.get(id))?.content).toBe(sealed);
   });
 
   it('locks when the app is backgrounded and re-opens on resume', async () => {
-    // `createPasscode` is the whole setup path: it makes the keyring and leaves
-    // the session unlocked, exactly as the settings screen does.
-    const created = await usePrivacyStore.getState().createPasscode(PASSCODE);
-    expect(created.ok).toBe(true);
+    // A passcode vault — the shape an older build leaves behind — still locks and
+    // re-opens the way it always did.
+    await enableLegacyPasscodeVault();
     expect(usePrivacyStore.getState().unlocked).toBe(true);
 
     // A quick switch stays open under the five-minute policy.
@@ -439,7 +463,7 @@ describe('session', () => {
   });
 
   it('locks the moment it is backgrounded under the default policy', async () => {
-    await usePrivacyStore.getState().createPasscode(PASSCODE);
+    await enableLegacyPasscodeVault();
     expect(usePrivacyStore.getState().settings.relockPolicy).toBe('immediate');
 
     usePrivacyStore.getState().handleBackground();
@@ -449,7 +473,7 @@ describe('session', () => {
   });
 
   it('opens again with the passcode after the session has locked', async () => {
-    await usePrivacyStore.getState().createPasscode(PASSCODE);
+    await enableLegacyPasscodeVault();
     const id = await mustNote('Therapy');
     await setNoteLocked(id, true);
 
@@ -463,7 +487,7 @@ describe('session', () => {
   });
 
   it('reports a wrong passcode without changing the vault', async () => {
-    await usePrivacyStore.getState().createPasscode(PASSCODE);
+    await enableLegacyPasscodeVault();
     const id = await mustNote('Therapy');
     await setNoteLocked(id, true);
     usePrivacyStore.getState().lock();
@@ -538,13 +562,16 @@ describe('device unlock', () => {
     expect(await unlockWithPasscode(PASSCODE)).not.toBeNull();
   });
 
-  it('round-trips the keyring when the passcode is the only thing that changed', async () => {
+  it('keeps the passcode wrap when the device wrap is removed again', async () => {
     setSecureStore(memorySecureStore());
     await enablePrivacy();
     expect(await enableDeviceUnlock()).toBe(true);
-    await changePasscode(PASSCODE, 'another passcode');
+    // Rewriting a keyring must never drop the other wrap: this is the same
+    // clobbering risk the passcode-change round trip used to guard.
+    await disableDeviceUnlock();
+    expect(await isDeviceUnlockReady()).toBe(false);
     forgetVaultKey();
-    expect(await unlockWithPasscode('another passcode')).not.toBeNull();
+    expect(await unlockWithPasscode(PASSCODE)).not.toBeNull();
   });
 });
 
@@ -561,7 +588,7 @@ describe('screen privacy', () => {
     // tasks drain before asserting.
     const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-    await usePrivacyStore.getState().createPasscode(PASSCODE);
+    await enableLegacyPasscodeVault();
     expect(usePrivacyStore.getState().unlocked).toBe(true);
     calls.length = 0;
 
@@ -668,15 +695,17 @@ describe('export and import', () => {
     const bundle = await exportVault();
     const original = (await readKeyring())?.wrappedByPasscode?.ct;
 
-    // Still on the same device, which has since changed its own passcode.
-    expect(await changePasscode(PASSCODE, 'a different passcode')).toMatchObject({ ok: true });
+    // Still on the same device, which has since wrapped the same key for its own
+    // device prompt as well.
+    setSecureStore(memorySecureStore());
+    expect(await enableDeviceUnlock()).toBe(true);
     const result = await importVault(bundle, 'merge');
 
     expect(result.keyringAdopted).toBe(false);
-    const after = (await readKeyring())?.wrappedByPasscode?.ct;
-    expect(after).not.toBe(original);
-    expect(await unlockWithPasscode('a different passcode')).not.toBeNull();
-    expect(await unlockWithPasscode(PASSCODE)).toBeNull();
+    // The local keyring is the one still in force: neither wrap was replaced.
+    expect((await readKeyring())?.wrappedByPasscode?.ct).toBe(original);
+    expect(await isDeviceUnlockReady()).toBe(true);
+    expect(await unlockWithPasscode(PASSCODE)).not.toBeNull();
   });
 
   it('leaves an unlocked vault exportable and importable unchanged', async () => {
@@ -695,7 +724,7 @@ describe('export and import', () => {
 
 describe('turning privacy off', () => {
   it('decrypts everything before removing the keyring', async () => {
-    await usePrivacyStore.getState().createPasscode(PASSCODE);
+    await enableLegacyPasscodeVault();
     const folder = await mustFolder('Private');
     const id = await mustLink('https://secret.example', folder);
     await setFolderLocked(folder, true);

@@ -1,0 +1,17 @@
+<resources>
+
+    <!--
+        The colour of the window itself, matched to the app's background in light
+        mode (see the `bg` token in `src/app/globals.css` and the `themeColor` in
+        the root layout).
+
+        It exists because the window background is the one surface the web layer
+        cannot paint: wherever the WebView is not covering the window (before the
+        first frame, and in the strip Capacitor reserves natively on WebViews that
+        cannot report their own insets) whatever is set here is what the user
+        sees. A bitmap there can therefore surface as a stray band of somebody
+        else's image above the app content. A flat colour cannot.
+    -->
+    <color name="stash_window_background">#FAFAFA</color>
+
+</resources>

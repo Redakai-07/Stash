@@ -252,12 +252,12 @@ export interface PrivacySettings {
   relockPolicy: RelockPolicy;
   /**
    * Whether a locked session covers the whole app or only locked items. On by
-   * default: it is the behaviour people expect from an app with a passcode.
+   * default: it is the behaviour people expect from an app that locks.
    */
   lockApp: boolean;
   /** Block screenshots and the recents thumbnail while unlocked. */
   secureScreen: boolean;
-  /** Offer the device-biometric fast path in addition to the passcode. */
+  /** Whether the device prompt is part of the way in. */
   biometric: boolean;
 }
 
@@ -278,10 +278,13 @@ export const DEFAULT_PRIVACY_SETTINGS: PrivacySettings = {
 export interface KeyringRecord {
   version: 1;
   /**
-   * Parameters needed to re-derive the passcode's wrapping key.
+   * Parameters needed to re-derive a passcode's wrapping key.
    *
-   * Absent when the vault is opened by the device lock alone — locking without
-   * ever typing a Stash passcode is a supported setup, not a degraded one.
+   * **Legacy only.** A vault set up today is opened by the device lock alone and
+   * has neither this nor `wrappedByPasscode` — locking without a Stash passcode
+   * is the supported setup, not a degraded one. They are still read, because a
+   * vault created by an earlier build (and a backup it wrote) is opened this way
+   * and nothing about that content can be recovered any other way.
    */
   kdf?: {
     algorithm: 'PBKDF2-SHA256';
@@ -289,7 +292,10 @@ export interface KeyringRecord {
     salt: string;
     iterations: number;
   };
-  /** The vault key sealed under the passcode-derived key. The recovery path. */
+  /**
+   * Legacy only: the vault key sealed under the passcode-derived key, for vaults
+   * that predate device-only locking. Nothing writes it any more.
+   */
   wrappedByPasscode?: EncryptedPayload;
   /**
    * The vault key sealed under a random key held in platform secure storage —
@@ -350,6 +356,10 @@ export interface ExportBundle {
    * unlocked — with the same passcode. Only ciphertext is ever written here, and
    * the device-bound wrapping is deliberately omitted: it is meaningless off the
    * device that created it.
+   *
+   * Absent for a vault locked with the device prompt alone: there is no portable
+   * key to hand over, and the receiving device is told so rather than left with a
+   * keyring that would promise an unlock it cannot perform.
    */
   security?: { keyring?: ExportedKeyring };
 }

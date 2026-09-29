@@ -135,15 +135,25 @@ export interface KeySetupResult {
 }
 
 /**
- * Turn privacy on for the first time.
+ * Create a keyring whose only wrap is a passcode.
  *
- * Generates a fresh vault key and records the passcode wrapping. Refuses if a
- * keyring already exists: replacing one would make every currently-sealed item
- * permanently unreadable, so there is no code path that does it implicitly.
+ * **Legacy / interop only.** The app no longer offers a passcode, because the
+ * system prompt is a stronger gate and a second secret was one more thing to
+ * lose. This exists for two reasons, both about not destroying old data:
+ *
+ *  - a vault created by an earlier build is opened by its passcode wrap, so the
+ *    shape that writes it has to stay readable;
+ *  - a backup file from an earlier build carries the same wrap, and adopting it
+ *    has to produce a keyring this code can open.
+ *
+ * Nothing in the app calls it to set up locking any more; `createKeyringWithDevice`
+ * is the only setup path. Refuses if a keyring already exists: replacing one
+ * would make every currently-sealed item permanently unreadable, so there is no
+ * code path that does it implicitly.
  */
 export async function createKeyring(passcode: string): Promise<KeySetupResult> {
   if (await hasKeyring()) {
-    return { ok: false, message: 'A passcode is already set for this vault.' };
+    return { ok: false, message: 'This vault is already locked.' };
   }
   const vault = await generateVaultKey();
   const salt = newSalt();
@@ -168,10 +178,11 @@ export async function createKeyring(passcode: string): Promise<KeySetupResult> {
  *
  * The vault key is wrapped under a device key and nothing else, which is what
  * makes "unlock" a system prompt instead of a text field. The cost is real and
- * is stated in the UI before this is called: without a passcode wrap there is no
- * second way in, so clearing the app's data or moving to a new device makes the
- * locked items permanently unreadable. `addPasscode` is how the user undoes that
- * later, without re-encrypting anything.
+ * is stated in the UI before this is called: there is no second way in, so
+ * clearing the app's data, losing the device, or restoring onto a new one makes
+ * the locked items permanently unreadable. That is the deliberate trade — a
+ * person who cannot pass the system prompt should not be reading them anyway —
+ * and it is why the screen that turns locking on says so in those words.
  */
 export async function createKeyringWithDevice(): Promise<KeySetupResult> {
   if (await hasKeyring()) {
@@ -194,30 +205,6 @@ export async function createKeyringWithDevice(): Promise<KeySetupResult> {
   await store.set(DEVICE_KEY_NAME, toBase64(deviceBytes));
   await writeKeyring({ version: 1, wrappedByDevice, createdAt: now, updatedAt: now });
   vaultKey = vault;
-  return { ok: true };
-}
-
-/**
- * Add a passcode to a vault that was locked with the device alone.
- *
- * Requires an unlocked session, because the vault key has to already be in
- * memory to be re-wrapped — this never rewrites or re-encrypts content, it adds
- * a second way to reach the same 32 bytes. From here the vault is portable: the
- * passcode wrap is the part that travels in a backup.
- */
-export async function addPasscode(passcode: string): Promise<KeySetupResult> {
-  const keyring = await readKeyring();
-  if (!keyring) return { ok: false, message: 'Locking is not set up for this vault.' };
-  if (!vaultKey) return { ok: false, message: 'Unlock first, then add a passcode.' };
-
-  const salt = newSalt();
-  const wrappingKey = await deriveWrappingKey(passcode, salt);
-  await writeKeyring({
-    ...keyring,
-    kdf: { algorithm: 'PBKDF2-SHA256', salt: toBase64(salt), iterations: PBKDF2_ITERATIONS },
-    wrappedByPasscode: await wrapBytes(wrappingKey, await exportKeyBytes(vaultKey)),
-    updatedAt: Date.now(),
-  });
   return { ok: true };
 }
 
@@ -353,45 +340,6 @@ export async function disableDeviceUnlock(): Promise<void> {
   const next: KeyringRecord = { ...keyring, updatedAt: Date.now() };
   delete next.wrappedByDevice;
   await writeKeyring(next);
-}
-
-/**
- * Change the passcode.
- *
- * The vault key itself does not change, so no content is re-encrypted: the same
- * 32 bytes are simply re-wrapped under a new derived key with a fresh salt. A
- * wrong old passcode fails the GCM tag and nothing is written.
- */
-export async function changePasscode(oldPasscode: string, nextPasscode: string): Promise<KeySetupResult> {
-  const keyring = await readKeyring();
-  if (!keyring) return { ok: false, message: 'No passcode is set for this vault.' };
-  if (!keyring.kdf || !keyring.wrappedByPasscode) {
-    return { ok: false, message: 'This vault has no passcode yet. Add one instead.' };
-  }
-
-  let vaultBytes: Uint8Array;
-  try {
-    const oldWrapping = await deriveWrappingKey(
-      oldPasscode,
-      fromBase64(keyring.kdf.salt),
-      keyring.kdf.iterations,
-    );
-    vaultBytes = await unwrapBytes(oldWrapping, keyring.wrappedByPasscode);
-  } catch {
-    return { ok: false, message: 'That is not the current passcode.' };
-  }
-
-  const salt = newSalt();
-  const wrappingKey = await deriveWrappingKey(nextPasscode, salt);
-  const wrappedByPasscode = await wrapBytes(wrappingKey, vaultBytes);
-
-  await writeKeyring({
-    ...keyring,
-    kdf: { algorithm: 'PBKDF2-SHA256', salt: toBase64(salt), iterations: PBKDF2_ITERATIONS },
-    wrappedByPasscode,
-    updatedAt: Date.now(),
-  });
-  return { ok: true };
 }
 
 /** Remove the keyring. Only valid once every sealed row has been opened. */

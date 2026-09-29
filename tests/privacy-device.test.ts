@@ -5,8 +5,6 @@ import { createNote, setNoteLocked } from '@/db/repos/notes';
 import { exportVault } from '@/db/repos/vault';
 import { createStaticAuthenticator, devicePromptName, setDeviceAuthenticator } from '@/lib/privacy/auth';
 import {
-  addPasscode,
-  changePasscode,
   createKeyring,
   createKeyringWithDevice,
   enableDeviceUnlock,
@@ -121,45 +119,24 @@ describe('setting up with the device lock alone', () => {
   });
 });
 
-describe('adding a passcode to a device-locked vault', () => {
-  it('adds a second way in without changing the key or the sealed rows', async () => {
+describe('a device-locked vault has no passcode', () => {
+  it('wraps the key once, under the device key, and nothing else', async () => {
     await createKeyringWithDevice();
-    const note = await createNote({ title: 'Passport scan', content: 'private', parentNoteId: null });
-    if (!note.ok) throw new Error('note');
-    await setNoteLocked(note.note.id, true);
-
-    forgetVaultKey();
-    const deviceKey = await unlockWithDevice();
-    expect(deviceKey).not.toBeNull();
-
-    const wrappedBefore = (await readKeyring())?.wrappedByDevice?.ct;
-    expect(await addPasscode('a portable secret')).toMatchObject({ ok: true });
 
     const keyring = await readKeyring();
-    expect(keyring?.wrappedByPasscode).toBeTruthy();
-    expect(keyring?.kdf?.algorithm).toBe('PBKDF2-SHA256');
-    // Nothing was re-encrypted: the device wrap is byte-identical.
-    expect(keyring?.wrappedByDevice?.ct).toBe(wrappedBefore);
-
-    forgetVaultKey();
-    expect(await unlockWithPasscode('a portable secret')).not.toBeNull();
-    expect(await unlockWithPasscode('the wrong one')).toBeNull();
-  });
-
-  it('needs an unlocked session, because the key has to exist to be re-wrapped', async () => {
-    await createKeyringWithDevice();
-    forgetVaultKey();
-    expect(await addPasscode('a portable secret')).toMatchObject({ ok: false });
-    // The failed attempt changed nothing.
+    expect(keyring?.wrappedByDevice).toBeTruthy();
+    // The whole point of the change: there is no second secret to lose, so a
+    // vault set up today has nothing for a passcode field to open.
+    expect(keyring?.wrappedByPasscode).toBeUndefined();
+    expect(keyring?.kdf).toBeUndefined();
     expect(await hasPasscodeWrap()).toBe(false);
+
+    forgetVaultKey();
+    expect(await unlockWithDevice()).not.toBeNull();
+    expect(await unlockWithPasscode('anything at all')).toBeNull();
   });
 
-  it('refuses to change a passcode that was never set', async () => {
-    await createKeyringWithDevice();
-    expect(await changePasscode('old', 'new')).toMatchObject({ ok: false });
-  });
-
-  it('still seals content, so the passcode protects data that is really encrypted', async () => {
+  it('still seals content, so what locking protects is really encrypted', async () => {
     await createKeyringWithDevice();
     const note = await createNote({ title: 'Passport scan', content: 'private', parentNoteId: null });
     if (!note.ok) throw new Error('note');
@@ -182,9 +159,14 @@ describe('exporting a device-locked vault', () => {
     expect(bundle.security?.keyring).toBeUndefined();
   });
 
-  it('exports the passcode wrap as soon as one is added', async () => {
-    await createKeyringWithDevice();
-    await addPasscode('a portable secret');
+  /**
+   * The interop half of the same rule. A vault created by an earlier build — or
+   * restored from a backup one of those wrote — carries a passcode wrap, and that
+   * wrap is the only portable key there is. It has to keep exporting, and keep
+   * opening, or that content becomes unreachable.
+   */
+  it('hands over the passcode wrap when the vault has one', async () => {
+    await createKeyring('a portable secret');
 
     const keyring = await readKeyring();
     const exported = toExportedKeyring(keyring!);
