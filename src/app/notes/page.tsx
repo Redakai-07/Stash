@@ -2,11 +2,13 @@
 
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight, FilePlus2, Layers, MoreHorizontal, NotebookPen, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FilePlus2, Layers, Lock, MoreHorizontal, NotebookPen, Star } from 'lucide-react';
 import type { Note, SavedLink } from '@/db/types';
 import { pluralize } from '@/lib/format';
 import { openExternal } from '@/lib/open-external';
 import { noteChildren, noteDescendantIds } from '@/lib/tree';
+import { isSealed } from '@/lib/privacy/protection';
+import { useRevealLocked } from '@/components/privacy/locked-row';
 import { useVaultStore } from '@/stores/vault-store';
 import { Button } from '@/components/ui/button';
 import { EmptyState, ListSurface, PageHeader, PageTitle, Section } from '@/components/ui/page';
@@ -94,6 +96,10 @@ function NotesView() {
 
     return { childCounts, linkCounts, trail, subnotes, resources };
   }, [current, links, noteLinks, notes, visibleNotes]);
+
+  // `current` is present but unreadable: see the editor branch below.
+  const sealed = Boolean(current) && isSealed(current ?? {});
+  const { reveal, busy: revealing } = useRevealLocked();
 
   const rootNotes = React.useMemo(() => noteChildren(visibleNotes, null), [visibleNotes]);
   const recentNotes = React.useMemo(
@@ -217,17 +223,47 @@ function NotesView() {
           </p>
         </PageHeader>
 
-        <NoteEditor
-          key={current.id}
-          note={current}
-          readOnly={protectedNoteIds.has(current.id)}
-          {...(current.isLocked
-            ? { onUnlock: () => void useVaultStore.getState().toggleNoteLocked(current.id, false) }
-            : {})}
-          save={async (draft) => {
-            await useVaultStore.getState().saveNoteDraft(current.id, draft);
-          }}
-        />
+        {/*
+          * A note that is still ciphertext — reached by a stale link, or by an
+          * import that brought content this device holds no key for — must not
+          * open as an empty editor. An empty editor looks like a note that lost
+          * its text, and typing into it is a write path against a row whose
+          * contents were never read. So it gets the same answer the row gave:
+          * the lock, and the prompt.
+          */}
+        {sealed ? (
+          <div className="px-4 py-6">
+            <div className="flex flex-col items-start gap-3 rounded-control border border-hairline bg-surface px-4 py-5">
+              <span className="flex items-center gap-2 text-row font-semibold text-fg">
+                <Lock size={17} strokeWidth={2} className="text-accent" aria-hidden />
+                This note is locked
+              </span>
+              <p className="text-meta leading-relaxed text-muted">
+                Its title and body are encrypted on disk and are not readable until the vault is unlocked.
+              </p>
+              <Button
+                variant="accentSoft"
+                size="sm"
+                disabled={revealing}
+                onClick={() => void reveal('note', current.id, () => undefined)}
+              >
+                {revealing ? 'Asking…' : 'Unlock to read it'}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <NoteEditor
+            key={current.id}
+            note={current}
+            readOnly={protectedNoteIds.has(current.id)}
+            {...(current.isLocked
+              ? { onUnlock: () => void useVaultStore.getState().toggleNoteLocked(current.id, false) }
+              : {})}
+            save={async (draft) => {
+              await useVaultStore.getState().saveNoteDraft(current.id, draft);
+            }}
+          />
+        )}
 
         <Section title="Subnotes" className="pt-2">
           {subnotes.length > 0 ? (

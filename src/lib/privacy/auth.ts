@@ -2,19 +2,22 @@
  * Device authentication: fingerprint, face, iris, or the device PIN/pattern/
  * password.
  *
- * Stash does not verify a biometric itself — it cannot, and it must not try. It
- * hands the request to Android's `BiometricPrompt` (via the Capacitor plugin) and
- * reacts to the outcome. That is why the plugin is configured with
- * `allowDeviceCredential`, so a device without enrolled biometry still has a
- * usable path rather than a dead end.
+ * Stash does not verify a biometric itself — it cannot, and it must not try. On
+ * Android it hands the request to `BiometricPrompt` (via the Capacitor plugin),
+ * which is why the plugin is configured with `allowDeviceCredential`: a phone
+ * with no enrolled finger still gets the system PIN/pattern/password dialog
+ * rather than a dead end. On a desktop it hands the request to the platform
+ * authenticator through WebAuthn (`webauthn.ts`), which is what raises Windows
+ * Hello — face, fingerprint or the Windows PIN.
  *
  * The result of a successful prompt is used as an *authorisation to unseal*, not
- * as a key. The vault key is unwrapped from Keystore-backed storage afterwards,
- * so the security of the data still rests on the platform keystore rather than on
- * a boolean this code returns.
+ * as a key. The vault key is unwrapped from platform storage afterwards, so the
+ * security of the data rests on that storage and the OS prompt in front of it,
+ * rather than on a boolean this code returns.
  *
  * Failure is always recoverable: every outcome below simply leaves the vault
- * locked and the passcode available. Nothing here can delete or corrupt data.
+ * locked and the passcode available. Nothing here can delete or corrupt data,
+ * and the failure is reported as a sentence rather than as a code.
  */
 export type AuthFailureReason =
   | 'cancelled'
@@ -30,6 +33,23 @@ export interface AuthOutcome {
   message?: string;
 }
 
+/**
+ * What to call the prompt on this platform.
+ *
+ * Named specifically wherever it is offered — "Windows Hello or your device
+ * PIN" tells someone what is about to appear on their screen, and "your
+ * fingerprint, face or phone PIN" does the same on a phone. Vague words like
+ * "biometrics" are what make a security dialog feel like a trap.
+ */
+export function devicePromptName(storeKind: 'native' | 'web' | 'unavailable'): string {
+  return storeKind === 'web' ? 'Windows Hello or your device PIN' : 'your fingerprint, face or phone PIN';
+}
+
+/** The short form, for a button label. */
+export function devicePromptTitle(storeKind: 'native' | 'web' | 'unavailable'): string {
+  return storeKind === 'web' ? 'Windows Hello' : 'your device';
+}
+
 export interface DeviceAuthenticator {
   readonly kind: 'native' | 'web';
   /** Whether device authentication could ever succeed on this device. */
@@ -38,14 +58,42 @@ export interface DeviceAuthenticator {
   authenticate(reason: string): Promise<AuthOutcome>;
 }
 
+/**
+ * Browsers, and the desktop builds that are one.
+ *
+ * Availability means "this machine could prompt *and* Stash has enrolled a
+ * credential here": a Windows PC with Windows Hello configured answers yes, a
+ * Linux box with no authenticator answers no, and an enrolled laptop answers yes
+ * on the next launch without re-enrolling.
+ */
 const WEB_AUTHENTICATOR: DeviceAuthenticator = {
   kind: 'web',
-  isAvailable: async () => false,
-  authenticate: async () => ({
-    ok: false,
-    reason: 'unavailable',
-    message: 'Device authentication is only available in the Android app.',
-  }),
+  isAvailable: async () => {
+    try {
+      const { hasDeviceCredential, isDevicePromptSupported } = await import('./webauthn');
+      return (await isDevicePromptSupported()) && (await hasDeviceCredential());
+    } catch {
+      return false;
+    }
+  },
+  // No `reason` argument: WebAuthn's dialog is drawn by the OS, which does not
+  // accept a message from the page the way `BiometricPrompt` does.
+  authenticate: async () => {
+    try {
+      const { promptDeviceCredential } = await import('./webauthn');
+      const outcome = await promptDeviceCredential();
+      if (outcome === 'ok') return { ok: true };
+      const failure: AuthFailureReason =
+        outcome === 'cancelled' ? 'cancelled' : outcome === 'unavailable' ? 'unavailable' : 'failed';
+      return { ok: false, reason: failure, message: messageFor(failure, 'web') };
+    } catch {
+      return {
+        ok: false,
+        reason: 'unavailable',
+        message: messageFor('unavailable', 'web'),
+      };
+    }
+  },
 };
 
 function mapErrorCode(code: string | undefined): AuthFailureReason {
@@ -67,7 +115,21 @@ function mapErrorCode(code: string | undefined): AuthFailureReason {
   }
 }
 
-function messageFor(reason: AuthFailureReason): string {
+function messageFor(reason: AuthFailureReason, kind: 'native' | 'web' = 'native'): string {
+  if (kind === 'web') {
+    switch (reason) {
+      case 'cancelled':
+        return 'The device prompt was dismissed. Your vault is still locked.';
+      case 'unavailable':
+        return 'This computer cannot prompt for a device unlock. Set up Windows Hello or a PIN, or use your Stash passcode.';
+      case 'lockout':
+        return 'Too many attempts. The device prompt is paused — use your Stash passcode.';
+      case 'failed':
+      default:
+        return 'That did not match. Use your Stash passcode.';
+    }
+  }
+
   switch (reason) {
     case 'cancelled':
       return 'Authentication was cancelled. Your vault is still locked.';

@@ -6,8 +6,10 @@ import type { Note } from '@/db/types';
 import { checklistProgress } from '@/lib/markdown';
 import { formatRelative, pluralize } from '@/lib/format';
 import { notePlainText } from '@/lib/notes';
+import { isSealed } from '@/lib/privacy/protection';
 import { useLongPress } from '@/hooks/use-long-press';
 import { useVaultStore } from '@/stores/vault-store';
+import { LockedRow, useRevealLocked } from '@/components/privacy/locked-row';
 import { cn } from '@/lib/utils';
 
 /**
@@ -51,6 +53,8 @@ export function NoteRow({
   // Hold a note for the same sheet its ⋯ button opens, so every list in the app
   // answers to the same gesture.
   const { handlers, consumeLongPress } = useLongPress(onShowActions);
+  // See `LockedRow`: a sealed note is a placeholder that asks for the prompt.
+  const { reveal, busy: revealing } = useRevealLocked();
   const checklist = React.useMemo(() => checklistProgress(note.content), [note.content]);
   const preview = React.useMemo(() => notePlainText(note.content, 80), [note.content]);
 
@@ -59,6 +63,18 @@ export function NoteRow({
   if (linkCount > 0) meta.push(pluralize(linkCount, 'link'));
   if (checklist) meta.push(`${checklist.done}/${checklist.total}`);
   meta.push(formatRelative(note.updatedAt));
+
+  if (isSealed(note)) {
+    return (
+      <LockedRow
+        kind="note"
+        subtitle={formatRelative(note.updatedAt)}
+        busy={revealing}
+        onReveal={() => void reveal('note', note.id, onOpen)}
+        className={className}
+      />
+    );
+  }
 
   return (
     <div className={cn('flex items-stretch', highlight && 'bg-accent-soft/40', className)}>

@@ -241,7 +241,31 @@ press of back drop the user out of the app.
 
 ---
 
-## 11. Motion
+## 11. Locked content
+
+The lock is a product feature with a visual grammar, so it has rules like any
+other part of the system.
+
+- **A locked item keeps its row.** It does not vanish from the list. The row
+  shows a single accent padlock, the words "Locked note / link / folder", the
+  timestamp it still knows, and "unlock to read". Nothing on that row is derived
+  from the content, because none of it exists in the clear: a locked folder's
+  name was never stored.
+- **Tapping it asks the same question the lock screen does** — the device prompt
+  where one is armed (`BiometricPrompt` on Android, Windows Hello on desktop),
+  the passcode where it is not. Never a silent no-op, never a dead end.
+- **The prompt comes first and runs on arrival** on the lock gate, because the
+  point of a device lock is that there is nothing to type. The passcode sits
+  underneath it, behind one tap, named "Use your Stash passcode".
+- **Name the platform dialog.** "Windows Hello or your device PIN" on a PC,
+  "your fingerprint, face or phone PIN" on a phone. Never "biometrics".
+- **Say what it costs, at the moment it is chosen.** A vault locked by the device
+  alone has no second way in; the copy says so beside the button, not in a help
+  page.
+- Locked rows never appear in search results, are never offered as a move
+  destination, and are never used for duplicate detection.
+
+## 12. Motion
 
 Four animations exist, each with a physical origin. Every one answers "what does
 this help the user understand?":
@@ -252,6 +276,9 @@ this help the user understand?":
 | `animate-pop-in`   | dialogs, the boot mark     | it came from where you tapped           |
 | `animate-rise`     | toasts                     | a confirmation arrived                  |
 | `animate-overlay-in`| scrims                   | the page is now behind the overlay      |
+
+(Two more exist and are not decoration: the locked row's spinner, which explains
+that the platform prompt is open, and the boot mark's single pulse.)
 
 Rules:
 
@@ -264,7 +291,7 @@ Rules:
 
 ---
 
-## 12. Accessibility
+## 13. Accessibility
 
 - Touch targets: ≥44px (`size-11`, `h-11`, `min-h-11`) for anything a thumb
   presses; icon-only buttons carry `aria-label`.
@@ -283,7 +310,7 @@ Rules:
 
 ---
 
-## 13. Empty, loading and error states
+## 14. Empty, loading and error states
 
 - An empty screen says one useful sentence and offers the action that fills it.
   No illustration, no rounded icon tile, no "0 items" statistics.
@@ -296,7 +323,7 @@ Rules:
 
 ---
 
-## 14. The signature interaction: capture
+## 15. The signature interaction: capture
 
 `Share sheet → Stash → choose destination → saved` is the most important path in
 the product and gets the most care:
@@ -311,7 +338,7 @@ the product and gets the most care:
 
 ---
 
-## 15. Checking a change against this document
+## 16. Checking a change against this document
 
 Before calling UI work done:
 

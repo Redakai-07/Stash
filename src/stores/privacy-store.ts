@@ -5,17 +5,22 @@ import { DEFAULT_PRIVACY_SETTINGS, type PrivacySettings } from '@/db/types';
 import { getPrivacySettings, setPrivacySettings } from '@/db/repos/settings';
 import { getDeviceAuthenticator } from '@/lib/privacy/auth';
 import {
+  addPasscode as addPasscodeRepo,
   changePasscode as changePasscodeRepo,
   createKeyring,
+  createKeyringWithDevice,
   destroyKeyring,
   disableDeviceUnlock,
   enableDeviceUnlock,
   forgetVaultKey,
   hasKeyring,
+  hasPasscodeWrap,
   isDeviceUnlockReady,
+  isSessionLocked,
   unlockWithDevice,
   unlockWithPasscode,
 } from '@/lib/privacy/keyring';
+import { getSecureStore } from '@/lib/privacy/secure-store';
 import { unsealEverything } from '@/lib/privacy/reconcile';
 import { applyScreenPrivacy } from '@/lib/privacy/screen';
 import { shouldLockOnBackground, shouldRelock } from '@/lib/privacy/session';
@@ -40,11 +45,27 @@ export interface ActionResult {
   message?: string;
 }
 
+export type DeviceStoreKind = 'native' | 'web' | 'unavailable';
+export type RevealKind = 'folder' | 'note' | 'link';
+
+export interface RevealRequest {
+  kind: RevealKind;
+  id: string;
+}
+
 export interface PrivacyState {
   ready: boolean;
   settings: PrivacySettings;
   /** True once a keyring row exists, i.e. privacy has been set up. */
   keyringPresent: boolean;
+  /**
+   * Whether a Stash passcode exists. `false` on a vault set up with the device
+   * lock alone, which is a supported setup: the system prompt is the way in and
+   * there is nothing to type. The UI says what that costs before it is chosen.
+   */
+  passcodeSet: boolean;
+  /** Where the device key lives, so the copy can be specific rather than vague. */
+  deviceStoreKind: DeviceStoreKind;
   unlocked: boolean;
   /** Whether this device can prompt for biometric or device-credential auth. */
   deviceAuthAvailable: boolean;
@@ -54,6 +75,14 @@ export interface PrivacyState {
   backgroundedAt: number | null;
   /** Explanation of the last failed unlock, shown on the gate. */
   message: string | null;
+  /**
+   * Something the user tapped while it was locked.
+   *
+   * Set by `requestReveal` so the gate can be raised for *this* reason — "open
+   * the locked thing you tapped" — even when locking is configured not to cover
+   * the whole app, which is the case where nothing else would prompt.
+   */
+  revealRequest: RevealRequest | null;
   busy: boolean;
 
   initialize: () => Promise<void>;
@@ -65,10 +94,29 @@ export interface PrivacyState {
   /** Re-read capabilities after they could have changed (resume, settings). */
   refreshCapabilities: () => Promise<void>;
   createPasscode: (passcode: string) => Promise<ActionResult>;
-  /** Turn privacy off: opens everything, then removes the keyring. */
+  /**
+   * Set up locking with the device prompt only — no passcode to invent.
+   * Refuses when this platform cannot prompt, rather than locking the vault with
+   * no way in.
+   */
+  createWithDevice: () => Promise<ActionResult>;
+  /** Add a passcode to a device-locked vault, making it portable again. */
+  addPasscode: (passcode: string) => Promise<ActionResult>;
+  /**
+   * Turn privacy off: opens everything, then removes the keyring. On a vault
+   * with no passcode the `passcode` argument is unused and the device prompt is
+   * what authorises the change.
+   */
   disable: (passcode: string) => Promise<ActionResult>;
   unlock: (passcode: string) => Promise<ActionResult>;
   unlockWithBiometrics: () => Promise<ActionResult>;
+  /**
+   * Ask to see a locked item: prompt the device if it can, otherwise queue the
+   * request so the gate opens for it. Resolves `ok` when the vault came back
+   * unlocked, which is the caller's signal to continue with what it was doing.
+   */
+  requestReveal: (kind: RevealKind, id: string) => Promise<ActionResult>;
+  clearReveal: () => void;
   lock: () => void;
   handleBackground: (now?: number) => void;
   /** Returns true when the policy expired the session on the way back in. */
@@ -87,6 +135,19 @@ export interface PrivacyState {
 }
 
 /**
+ * The two facts the privacy UI needs to be specific about: is there a passcode,
+ * and where does the device key live.
+ *
+ * Asked as a pair because they are read together and both answer "what would it
+ * take to open this vault somewhere else".
+ */
+async function describeDevicePath(keyring: boolean): Promise<[boolean, DeviceStoreKind]> {
+  const store = await getSecureStore();
+  if (!keyring) return [false, store.kind];
+  return [await hasPasscodeWrap(), store.kind];
+}
+
+/**
  * Screen privacy follows the session: always on while locked, and on while
  * unlocked only when the user asked for it.
  */
@@ -98,6 +159,8 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
   ready: false,
   settings: { ...DEFAULT_PRIVACY_SETTINGS },
   keyringPresent: false,
+  passcodeSet: false,
+  deviceStoreKind: 'unavailable',
   // Starts locked. On a cold start nothing is unlocked until the user says so,
   // which is what makes "after app restart the vault is locked" true by default
   // rather than by remembering to set a flag.
@@ -106,6 +169,7 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
   deviceUnlockReady: false,
   backgroundedAt: null,
   message: null,
+  revealRequest: null,
   busy: false,
 
   initialize: async () => {
@@ -127,6 +191,7 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
     const authenticator = await getDeviceAuthenticator();
     const deviceAuthAvailable = settings.biometric ? await authenticator.isAvailable() : false;
     const deviceUnlockReady = keyring ? await isDeviceUnlockReady() : false;
+    const [passcodeSet, deviceStoreKind] = await describeDevicePath(keyring);
 
     // With no keyring there is nothing to protect, so the session starts open.
     // With one, it starts locked: a cold start never inherits the last session's
@@ -138,6 +203,8 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
       ready: true,
       settings,
       keyringPresent: keyring,
+      passcodeSet,
+      deviceStoreKind,
       deviceAuthAvailable,
       deviceUnlockReady,
       unlocked,
@@ -155,11 +222,14 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
     const authenticator = await getDeviceAuthenticator();
     const deviceAuthAvailable = settings.biometric ? await authenticator.isAvailable() : false;
     const deviceUnlockReady = keyring ? await isDeviceUnlockReady() : false;
+    const [passcodeSet, deviceStoreKind] = await describeDevicePath(keyring);
 
     set({
       ready: true,
       settings,
       keyringPresent: keyring,
+      passcodeSet,
+      deviceStoreKind,
       deviceAuthAvailable,
       deviceUnlockReady,
       unlocked: !keyring,
@@ -173,7 +243,8 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
     const settings = get().settings;
     const authenticator = await getDeviceAuthenticator();
     const deviceAuthAvailable = settings.biometric ? await authenticator.isAvailable() : false;
-    set({ deviceAuthAvailable, deviceUnlockReady: await isDeviceUnlockReady() });
+    const [passcodeSet, deviceStoreKind] = await describeDevicePath(get().keyringPresent);
+    set({ deviceAuthAvailable, deviceUnlockReady: await isDeviceUnlockReady(), passcodeSet, deviceStoreKind });
   },
 
   createPasscode: async (passcode) => {
@@ -197,11 +268,66 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
       busy: false,
       settings,
       keyringPresent: true,
-      unlocked: true,
+      passcodeSet: true,
       deviceUnlockReady,
+      unlocked: true,
       message: null,
     });
     syncScreenPrivacy(settings.secureScreen, true);
+    return { ok: true };
+  },
+
+  createWithDevice: async () => {
+    set({ busy: true, message: null });
+
+    // The prompt runs *first*, and the keyring is only written once it has
+    // succeeded. The other order would leave a vault locked by a device key that
+    // was never actually armed — a vault with no way in.
+    const authenticator = await getDeviceAuthenticator();
+    if (!(await authenticator.isAvailable())) {
+      const message =
+        'This device cannot prompt for a device unlock yet. Set up a screen lock or Windows Hello, or use a Stash passcode.';
+      set({ busy: false, message });
+      return { ok: false, message };
+    }
+
+    const outcome = await authenticator.authenticate('Lock your Stash vault with this device');
+    if (!outcome.ok) {
+      set({ busy: false, message: outcome.message ?? 'That did not succeed.' });
+      return { ok: false, message: outcome.message };
+    }
+
+    const result = await createKeyringWithDevice();
+    if (!result.ok) {
+      set({ busy: false, message: result.message ?? null });
+      return { ok: false, message: result.message };
+    }
+
+    const settings = await setPrivacySettings({ enabled: true, biometric: true });
+    const [passcodeSet, deviceStoreKind] = await describeDevicePath(true);
+    set({
+      busy: false,
+      settings,
+      keyringPresent: true,
+      passcodeSet,
+      deviceStoreKind,
+      deviceUnlockReady: true,
+      deviceAuthAvailable: true,
+      unlocked: true,
+      message: null,
+    });
+    syncScreenPrivacy(settings.secureScreen, true);
+    return { ok: true };
+  },
+
+  addPasscode: async (passcode) => {
+    set({ busy: true, message: null });
+    const result = await addPasscodeRepo(passcode);
+    if (!result.ok) {
+      set({ busy: false, message: result.message ?? null });
+      return { ok: false, message: result.message };
+    }
+    set({ busy: false, passcodeSet: true, message: null });
     return { ok: true };
   },
 
@@ -209,11 +335,29 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
     set({ busy: true, message: null });
 
     // Verify first: turning privacy off opens everything, and that must not be
-    // something a passer-by can trigger on an unlocked phone.
-    const key = await unlockWithPasscode(passcode);
-    if (!key) {
-      set({ busy: false, message: 'That passcode did not match.' });
-      return { ok: false, message: 'That passcode did not match.' };
+    // something a passer-by can trigger on an unlocked phone. A vault with no
+    // passcode proves presence the same way it opens every other time — with the
+    // device prompt — so there is no path where "turn locking off" is a single
+    // unauthenticated tap.
+    if (!(await hasPasscodeWrap())) {
+      const authenticator = await getDeviceAuthenticator();
+      const outcome = await authenticator.authenticate('Turn off locking for your Stash vault');
+      if (!outcome.ok) {
+        set({ busy: false, message: outcome.message ?? 'That did not succeed.' });
+        return { ok: false, message: outcome.message };
+      }
+      const deviceKey = await unlockWithDevice();
+      if (!deviceKey) {
+        const message = 'This device can no longer open the vault. Use a passcode, if one was added.';
+        set({ busy: false, message });
+        return { ok: false, message };
+      }
+    } else {
+      const key = await unlockWithPasscode(passcode);
+      if (!key) {
+        set({ busy: false, message: 'That passcode did not match.' });
+        return { ok: false, message: 'That passcode did not match.' };
+      }
     }
 
     // Open every sealed row before the keyring goes, so nothing is left
@@ -226,6 +370,7 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
       busy: false,
       settings,
       keyringPresent: false,
+      passcodeSet: false,
       unlocked: true,
       deviceUnlockReady: false,
       message: null,
@@ -236,6 +381,13 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
 
   unlock: async (passcode) => {
     set({ busy: true, message: null });
+    // Asked of the keyring rather than of the cached flag: an import can adopt
+    // a keyring underneath us, and the answer that matters is what is on disk.
+    if (!(await hasPasscodeWrap())) {
+      const message = 'This vault opens with your device lock. Use that, or add a passcode in Settings.';
+      set({ busy: false, passcodeSet: false, message });
+      return { ok: false, message };
+    }
     // `null` covers both "no keyring" and "the GCM tag did not verify", which are
     // the same answer to the user: this passcode does not open this vault.
     const key = await unlockWithPasscode(passcode);
@@ -244,10 +396,35 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
       return { ok: false, message: 'That passcode did not match.' };
     }
     const settings = get().settings;
-    set({ busy: false, unlocked: true, backgroundedAt: null, message: null });
+    // The passcode path clears a queued reveal too, so the gate steps aside the
+    // moment the item behind it becomes readable.
+    set({ busy: false, unlocked: true, backgroundedAt: null, message: null, revealRequest: null });
     syncScreenPrivacy(settings.secureScreen, true);
     return { ok: true };
   },
+
+  requestReveal: async (kind, id) => {
+    // Asked of the session and of the keyring rather than of the cached flags:
+    // an import can replace the keyring underneath us, and "is there anything to
+    // unlock" is a fact about the key, not about the last render.
+    if (!isSessionLocked() || !(await hasKeyring())) return { ok: true };
+
+    // The device prompt first, because it is one deliberate act with nothing to
+    // type. A cancelled prompt is *not* an error here: it just means the gate
+    // takes over, with the passcode field already open.
+    if (await isDeviceUnlockReady()) {
+      const authenticator = await getDeviceAuthenticator();
+      if (await authenticator.isAvailable()) {
+        const result = await get().unlockWithBiometrics();
+        if (result.ok) return result;
+      }
+    }
+
+    set({ revealRequest: { kind, id } });
+    return { ok: false, message: 'Unlock to open the locked item you tapped.' };
+  },
+
+  clearReveal: () => set({ revealRequest: null }),
 
   unlockWithBiometrics: async () => {
     set({ busy: true, message: null });
@@ -267,16 +444,17 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
       // The prompt succeeded but the device key is gone (data cleared, restore
       // on a new phone, keystore entry invalidated). Fall back, do not damage.
       const deviceUnlockReady = await isDeviceUnlockReady();
-      set({
-        busy: false,
-        deviceUnlockReady,
-        message: 'Your passcode is needed to open the vault on this device.',
-      });
-      return { ok: false, message: 'Your passcode is needed to open the vault on this device.' };
+      const message = (await hasPasscodeWrap())
+        ? 'Your passcode is needed to open the vault on this device.'
+        : 'This device can no longer open the vault, and no passcode was ever added. Locked items are unreadable.';
+      set({ busy: false, deviceUnlockReady, message });
+      return { ok: false, message };
     }
 
     const settings = get().settings;
-    set({ busy: false, unlocked: true, backgroundedAt: null, message: null });
+    // A queued reveal is satisfied by the unlock it was waiting for: whatever
+    // asked for it re-renders with real data one refresh later.
+    set({ busy: false, unlocked: true, backgroundedAt: null, message: null, revealRequest: null });
     syncScreenPrivacy(settings.secureScreen, true);
     return { ok: true };
   },
@@ -329,6 +507,7 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
     set({
       settings,
       keyringPresent: false,
+      passcodeSet: false,
       unlocked: true,
       deviceUnlockReady: false,
       message: null,
@@ -339,7 +518,7 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
   armBiometrics: async () => {
     const ok = await enableDeviceUnlock();
     if (!ok) {
-      return { ok: false, message: 'This device cannot store a key for biometric unlock.' };
+      return { ok: false, message: 'This device could not set up the unlock prompt, so nothing was armed.' };
     }
     const settings = await setPrivacySettings({ biometric: true });
     set({ settings, deviceUnlockReady: true });

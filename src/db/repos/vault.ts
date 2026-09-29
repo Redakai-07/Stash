@@ -141,7 +141,11 @@ export async function exportVault(): Promise<ExportBundle> {
     meta: meta.filter((row) => row.key !== 'db.schemaInfo' && row.key !== 'db.seeded'),
   };
 
-  if (keyring) bundle.security = { keyring: toExportedKeyring(keyring) };
+  // Absent for a vault locked by the device alone — see `toExportedKeyring`.
+  if (keyring) {
+    const exported = toExportedKeyring(keyring);
+    if (exported) bundle.security = { keyring: exported };
+  }
   return bundle;
 }
 

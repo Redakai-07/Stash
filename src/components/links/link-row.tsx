@@ -3,8 +3,10 @@
 import { Link2Off, Lock, MoreHorizontal, Star } from 'lucide-react';
 import type { SavedLink } from '@/db/types';
 import { displayUrl, formatRelative } from '@/lib/format';
+import { isSealed } from '@/lib/privacy/protection';
 import { useLongPress } from '@/hooks/use-long-press';
 import { useVaultStore, selectTagsForLink } from '@/stores/vault-store';
+import { LockedRow, useRevealLocked } from '@/components/privacy/locked-row';
 import { cn } from '@/lib/utils';
 
 /**
@@ -52,11 +54,27 @@ export function LinkRow({
   // Long press is a shortcut to the same sheet the ⋯ button opens, for anyone
   // who reaches for it; the visible button keeps it discoverable.
   const { handlers, consumeLongPress } = useLongPress(onShowActions);
+  // A sealed row is unreadable in this session: it renders as a placeholder that
+  // asks for the device prompt, and the caller's `onOpen` runs only once the
+  // vault is unlocked.
+  const { reveal, busy } = useRevealLocked();
 
   const handleOpen = () => {
     if (consumeLongPress()) return;
     onOpen();
   };
+
+  if (isSealed(link)) {
+    return (
+      <LockedRow
+        kind="link"
+        subtitle={formatRelative(link.createdAt)}
+        busy={busy}
+        onReveal={() => void reveal('link', link.id, onOpen)}
+        className={className}
+      />
+    );
+  }
 
   return (
     <div className={cn('flex items-stretch', highlight && 'bg-accent-soft/40', className)}>

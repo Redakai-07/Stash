@@ -26,6 +26,8 @@ import { TreePickerList, type TreePickerItem } from '@/components/ui/tree-picker
 
 export type { DestinationKind, DestinationSelection } from '@/lib/destination';
 
+import { isSealed } from '@/lib/privacy/protection';
+
 export const INBOX_SELECTION = INBOX_DESTINATION;
 export const FAVORITES_SELECTION = FAVORITES_DESTINATION;
 
@@ -56,6 +58,16 @@ export function FolderDestinationList({
   className,
   footer,
 }: FolderDestinationListProps) {
+  /*
+   * A locked folder is not a destination while it is unreadable.
+   *
+   * Its name is ciphertext in this session — the row would read "Locked folder"
+   * with no path — and filing something into a folder you cannot identify is a
+   * way to lose it. The folder reappears here the moment the vault is unlocked,
+   * so this hides nothing permanently.
+   */
+  const destinations = React.useMemo(() => folders.filter((folder) => !isSealed(folder)), [folders]);
+
   const items = React.useMemo<TreePickerItem[]>(() => {
     const rows: TreePickerItem[] = [];
 
@@ -80,7 +92,7 @@ export function FolderDestinationList({
       });
     }
 
-    for (const entry of flattenFolders(folders)) {
+    for (const entry of flattenFolders(destinations)) {
       rows.push({
         key: `folder:${entry.folder.id}`,
         label: entry.folder.name,
@@ -96,7 +108,7 @@ export function FolderDestinationList({
     }
 
     return rows;
-  }, [folders, showFavorites, showInbox]);
+  }, [destinations, showFavorites, showInbox]);
 
   const handleSelect = React.useCallback(
     (key: string) => {
@@ -114,7 +126,7 @@ export function FolderDestinationList({
       onSelect={handleSelect}
       alwaysFilterable={alwaysFilterable}
       filterPlaceholder={filterPlaceholder}
-      emptyTitle={folders.length === 0 ? 'No folders yet' : 'Nothing here yet'}
+      emptyTitle={destinations.length === 0 ? 'No folders yet' : 'Nothing here yet'}
       emptyHint={folders.length === 0 ? 'Use “Create folder” below to add one.' : undefined}
       {...(footer ? { footer } : {})}
       {...(className ? { className } : {})}

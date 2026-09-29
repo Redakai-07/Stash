@@ -219,10 +219,20 @@ export async function buildBackup(options: {
     const envelope = await encryptBackupPayload(inner, options.passphrase);
     backup.kdf = envelope.kdf;
     backup.payload = envelope.payload;
-    if (keyring && includeKeyring) backup.security = { keyring: toExportedKeyring(keyring) };
+    // `toExportedKeyring` answers `null` for a device-only vault: there is no
+    // passcode wrap to hand over, and writing a keyring the receiving device
+    // cannot use would be a false promise. The sealed rows still travel; they
+    // just arrive locked, which the import side already presents as such.
+    if (keyring && includeKeyring) {
+      const exported = toExportedKeyring(keyring);
+      if (exported) backup.security = { keyring: exported };
+    }
   } else {
     backup.data = data;
-    if (keyring && includeKeyring) backup.security = { keyring: toExportedKeyring(keyring) };
+    if (keyring && includeKeyring) {
+      const exported = toExportedKeyring(keyring);
+      if (exported) backup.security = { keyring: exported };
+    }
   }
 
   return {
@@ -324,7 +334,10 @@ export async function buildEmergencyBackup(): Promise<string> {
     summary: summarizeBackup(data),
     data,
   };
-  if (keyring) backup.security = { keyring: toExportedKeyring(keyring) };
+  if (keyring) {
+    const exported = toExportedKeyring(keyring);
+    if (exported) backup.security = { keyring: exported };
+  }
   return JSON.stringify(backup, null, 2);
 }
 

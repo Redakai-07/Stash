@@ -12,6 +12,7 @@ import {
   Unlock,
 } from 'lucide-react';
 import { pluralize } from '@/lib/format';
+import { devicePromptName } from '@/lib/privacy/auth';
 import { RELOCK_POLICIES } from '@/lib/privacy/session';
 import type { RelockPolicy } from '@/db/types';
 import { usePrivacyStore } from '@/stores/privacy-store';
@@ -32,18 +33,22 @@ import { PasscodeInput, PasscodeReassurance, validateNewPasscode } from './passc
  * fact that a forgotten passcode means the locked items are gone.
  */
 
-type Mode = 'idle' | 'create' | 'change' | 'disable' | 'abandon';
+type Mode = 'idle' | 'create' | 'add-passcode' | 'change' | 'disable' | 'abandon';
 
 export function PrivacySettings() {
   const ready = usePrivacyStore((state) => state.ready);
   const settings = usePrivacyStore((state) => state.settings);
   const keyringPresent = usePrivacyStore((state) => state.keyringPresent);
+  const passcodeSet = usePrivacyStore((state) => state.passcodeSet);
   const unlocked = usePrivacyStore((state) => state.unlocked);
   const deviceAuthAvailable = usePrivacyStore((state) => state.deviceAuthAvailable);
   const deviceUnlockReady = usePrivacyStore((state) => state.deviceUnlockReady);
+  const deviceStoreKind = usePrivacyStore((state) => state.deviceStoreKind);
   const busy = usePrivacyStore((state) => state.busy);
 
   const createPasscode = usePrivacyStore((state) => state.createPasscode);
+  const createWithDevice = usePrivacyStore((state) => state.createWithDevice);
+  const addPasscode = usePrivacyStore((state) => state.addPasscode);
   const changePasscode = usePrivacyStore((state) => state.changePasscode);
   const disable = usePrivacyStore((state) => state.disable);
   const abandonLock = usePrivacyStore((state) => state.abandonLock);
@@ -89,6 +94,33 @@ export function PrivacySettings() {
     }
     reset();
     toast('Locking is on', { tone: 'success' });
+  };
+
+  /** Locking with the system prompt alone — no passcode to invent. */
+  const submitCreateWithDevice = async () => {
+    const result = await createWithDevice();
+    if (!result.ok) {
+      setError(result.message ?? 'Could not turn on locking.');
+      return;
+    }
+    reset();
+    toast('Locking is on', { tone: 'success' });
+  };
+
+  /** Give a device-locked vault a second, portable way in. */
+  const submitAddPasscode = async () => {
+    const invalid = validateNewPasscode(passcode, confirmation);
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
+    const result = await addPasscode(passcode);
+    if (!result.ok) {
+      setError(result.message ?? 'Could not add a passcode.');
+      return;
+    }
+    reset();
+    toast('Passcode added', { tone: 'success' });
   };
 
   const submitChange = async () => {
@@ -139,9 +171,9 @@ export function PrivacySettings() {
               <p className="mt-0.5 text-meta leading-relaxed text-subtle">
                 {keyringPresent
                   ? hasLocks
-                    ? `${pluralize(lockedCounts.notes, 'note')}, ${pluralize(lockedCounts.links, 'link')} and ${pluralize(lockedCounts.folders, 'folder')} protected`
-                    : 'No items are locked yet. Lock a folder, note or link to use this.'
-                  : 'Set a passcode to lock folders, notes and links so they are encrypted at rest.'}
+                    ? `${pluralize(lockedCounts.notes, 'note')}, ${pluralize(lockedCounts.links, 'link')} and ${pluralize(lockedCounts.folders, 'folder')} protected · ${passcodeSet ? 'passcode set' : 'device lock only'}`
+                    : `No items are locked yet. Lock a folder, note or link to use this. ${passcodeSet ? 'Your passcode is set.' : 'No passcode is set on this device.'}`
+                  : 'Lock folders, notes and links so they are encrypted at rest. Use your device lock, a passcode, or both.'}
               </p>
             </div>
             {keyringPresent && unlocked ? (
@@ -154,19 +186,65 @@ export function PrivacySettings() {
           {mode === 'idle' ? (
             <div className="border-t border-border px-3 py-3">
               {!keyringPresent ? (
-                <>
-                  <Button variant="accentSoft" className="w-full" onClick={() => setMode('create')}>
+                <div className="flex flex-col gap-2">
+                  {/*
+                    * The device prompt is offered first, because it is the
+                    * setup that asks nothing of the user's memory. Its cost is
+                    * stated in the same breath rather than discovered later.
+                    */}
+                  {deviceAuthAvailable ? (
+                    <>
+                      <Button
+                        variant="accentSoft"
+                        className="w-full"
+                        onClick={() => void submitCreateWithDevice()}
+                        disabled={busy}
+                      >
+                        <Fingerprint size={18} strokeWidth={1.9} aria-hidden />
+                        Use {devicePromptName(deviceStoreKind)}
+                      </Button>
+                      <p className="px-0.5 text-meta leading-relaxed text-subtle">
+                        Nothing to remember and nothing to type. Locked items on this device can only be opened with
+                        that prompt — so if the app&apos;s data is cleared, they cannot be recovered. Add a passcode
+                        below and they travel with your backup instead.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="px-0.5 text-meta leading-relaxed text-subtle">
+                      {deviceStoreKind === 'web'
+                        ? 'This computer cannot prompt for a device unlock yet. Set up Windows Hello or a PIN in Windows Settings, or set a passcode below.'
+                        : 'This device has no screen lock or enrolled biometrics yet. Set one up, or set a passcode below.'}
+                    </p>
+                  )}
+                  <Button variant="surface" className="w-full justify-start" onClick={() => setMode('create')}>
                     <ShieldCheck size={18} strokeWidth={1.9} aria-hidden />
-                    Set a passcode
+                    Set a passcode instead
                   </Button>
-                  <PasscodeReassurance className="mt-2.5 px-0.5" />
-                </>
+                  <PasscodeReassurance className="mt-0.5 px-0.5" />
+                </div>
               ) : (
                 <div className="flex flex-col gap-2">
-                  <Button variant="surface" className="justify-start" onClick={() => setMode('change')}>
-                    <KeyRound size={18} strokeWidth={1.9} aria-hidden />
-                    Change passcode
-                  </Button>
+                  {passcodeSet ? (
+                    <Button variant="surface" className="justify-start" onClick={() => setMode('change')}>
+                      <KeyRound size={18} strokeWidth={1.9} aria-hidden />
+                      Change passcode
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        variant="accentSoft"
+                        className="justify-start"
+                        onClick={() => setMode('add-passcode')}
+                      >
+                        <KeyRound size={18} strokeWidth={1.9} aria-hidden />
+                        Add a passcode
+                      </Button>
+                      <p className="px-0.5 text-meta leading-relaxed text-subtle">
+                        Locked items currently open with the device lock alone, so they are tied to this device. A
+                        passcode is what lets them survive a new phone, a wiped app or a restore.
+                      </p>
+                    </>
+                  )}
                   <Button
                     variant="surface"
                     className="justify-start"
@@ -216,6 +294,47 @@ export function PrivacySettings() {
                   </Button>
                 </div>
                 <PasscodeReassurance />
+              </div>
+            </div>
+          ) : null}
+
+          {mode === 'add-passcode' ? (
+            <div className="border-t border-border px-3 py-3">
+              <div className="flex flex-col gap-3">
+                <p className="rounded-xl border border-warning/30 bg-surface-2 px-3 py-2.5 text-meta leading-relaxed text-fg/85">
+                  Adding a passcode does not change the key or re-encrypt anything: it wraps the same key a second time,
+                  so the vault can be opened without this device.
+                </p>
+                <PasscodeInput
+                  label="New passcode"
+                  value={passcode}
+                  onChange={(value) => {
+                    setPasscode(value);
+                    setError(null);
+                  }}
+                  autoFocus
+                  disabled={busy}
+                />
+                <PasscodeInput
+                  label="Confirm passcode"
+                  value={confirmation}
+                  onChange={(value) => {
+                    setConfirmation(value);
+                    setError(null);
+                  }}
+                  onSubmit={() => void submitAddPasscode()}
+                  disabled={busy}
+                  tone={error ? 'danger' : 'default'}
+                  hint={error ?? undefined}
+                />
+                <div className="flex gap-2">
+                  <Button variant="ghost" className="flex-1" onClick={reset} disabled={busy}>
+                    Cancel
+                  </Button>
+                  <Button variant="primary" className="flex-1" onClick={() => void submitAddPasscode()} disabled={busy}>
+                    Add passcode
+                  </Button>
+                </div>
               </div>
             </div>
           ) : null}
@@ -270,27 +389,38 @@ export function PrivacySettings() {
             <div className="border-t border-border px-3 py-3">
               <div className="flex flex-col gap-3">
                 <p className="rounded-xl border border-warning/30 bg-surface-2 px-3 py-2.5 text-meta leading-relaxed text-fg/85">
-                  Turning locking off decrypts every locked item and stores it in the clear again. The passcode is
-                  removed.
+                  Turning locking off decrypts every locked item and stores it in the clear again.{' '}
+                  {passcodeSet ? 'The passcode is removed.' : 'The device lock is removed from this vault.'}
                 </p>
-                <PasscodeInput
-                  label="Passcode"
-                  value={passcode}
-                  onChange={(value) => {
-                    setPasscode(value);
-                    setError(null);
-                  }}
-                  onSubmit={() => void submitDisable()}
-                  autoFocus
-                  disabled={busy}
-                  tone={error ? 'danger' : 'default'}
-                  hint={error ?? undefined}
-                />
+                {passcodeSet ? (
+                  <PasscodeInput
+                    label="Passcode"
+                    value={passcode}
+                    onChange={(value) => {
+                      setPasscode(value);
+                      setError(null);
+                    }}
+                    onSubmit={() => void submitDisable()}
+                    autoFocus
+                    disabled={busy}
+                    tone={error ? 'danger' : 'default'}
+                    hint={error ?? undefined}
+                  />
+                ) : (
+                  <p className="text-meta leading-relaxed text-muted">
+                    There is no passcode on this vault, so {devicePromptName(deviceStoreKind)} confirms it instead.
+                  </p>
+                )}
                 <div className="flex gap-2">
                   <Button variant="ghost" className="flex-1" onClick={reset} disabled={busy}>
                     Cancel
                   </Button>
-                  <Button variant="surface" className="flex-1" onClick={() => void submitDisable()} disabled={busy}>
+                  <Button
+                    variant="surface"
+                    className="flex-1"
+                    disabled={busy || (passcodeSet && passcode.length === 0)}
+                    onClick={() => void submitDisable()}
+                  >
                     Turn off and decrypt
                   </Button>
                 </div>
@@ -365,11 +495,15 @@ export function PrivacySettings() {
             <div className="mx-4 overflow-hidden rounded-control border border-hairline bg-surface">
               <ToggleRow
                 icon={<Fingerprint size={17} strokeWidth={1.9} aria-hidden />}
-                label="Use fingerprint or face"
+                label={deviceStoreKind === 'web' ? 'Use Windows Hello' : 'Use fingerprint or face'}
                 description={
                   deviceAuthAvailable
-                    ? 'A device key in Android Keystore unwraps the vault key after a successful prompt.'
-                    : 'No biometrics or screen lock are set up on this device.'
+                    ? deviceStoreKind === 'web'
+                      ? 'Unlocking asks Windows Hello (or your device PIN) and only then unwraps the vault key from this app’s own storage.'
+                      : 'A device key in Android Keystore unwraps the vault key after a successful prompt.'
+                    : deviceStoreKind === 'web'
+                      ? 'This computer has no prompt available yet. Set up Windows Hello or a PIN, then reload Stash.'
+                      : 'No biometrics or screen lock are set up on this device.'
                 }
                 checked={settings.biometric && deviceUnlockReady}
                 disabled={!deviceAuthAvailable}
@@ -389,7 +523,15 @@ export function PrivacySettings() {
             </div>
             {!deviceUnlockReady && settings.biometric && deviceAuthAvailable ? (
               <p className="px-5 pt-2 text-meta leading-relaxed text-subtle">
-                Unlock once with your passcode to arm the biometric fast path on this device.
+                {passcodeSet
+                  ? 'Unlock once with your passcode to arm the fast path on this device.'
+                  : 'This vault has no passcode, so the fast path is the only way in — turn it on from the section above.'}
+              </p>
+            ) : null}
+            {keyringPresent && !passcodeSet ? (
+              <p className="px-5 pt-2 text-meta leading-relaxed text-warning">
+                No passcode is set. Locked items can only be opened on this device, and nothing can recover them if
+                this device is lost or the app&apos;s data is cleared.
               </p>
             ) : null}
           </Section>
@@ -403,18 +545,21 @@ export function PrivacySettings() {
                   everything inside it.
                 </li>
                 <li>
-                  <span className="font-medium text-fg">Still visible:</span> the fact that a locked item exists,
-                  how the tree is arranged, timestamps, favourites, tags and which app a link came from. Sizes and
-                  counts of locked folders are hidden while locked.
+                  <span className="font-medium text-fg">Still visible:</span> that a locked item exists and where it
+                  sits — it keeps its row, its place in the tree, its counts and its timestamps, and shows as a
+                  locked entry you can tap to unlock. Also visible: which app a link came from, and its tags.
                 </li>
                 <li>
-                  <span className="font-medium text-fg">Key location:</span> the vault key is wrapped by your
-                  passcode and the wrapped form is the only copy stored. It is never in the backup file&apos;s
-                  plaintext, in a browser store, or in the app&apos;s code.
+                  <span className="font-medium text-fg">Key location:</span> the vault key is wrapped — by your
+                  passcode, by the device key, or both — and only the wrapped form is stored. It is never in the
+                  backup file&apos;s plaintext, in a browser store, or in the app&apos;s code.
                 </li>
                 <li>
                   <span className="font-medium text-fg">After a restart:</span> the vault opens locked and the key
-                  exists only in your passcode and, if enabled, in Android Keystore-backed storage.
+                  exists only in your passcode and, where armed, the device key
+                  {deviceStoreKind === 'web'
+                    ? ' — kept by this app on this computer, behind the system prompt. A passcode is the stronger secret.'
+                    : ' in Android Keystore-backed storage.'}
                 </li>
               </ul>
             </div>

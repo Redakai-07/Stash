@@ -403,10 +403,10 @@ describe('session', () => {
     await enablePrivacy();
     const id = await mustNote('Therapy');
     await setNoteLocked(id, true);
-    const before = (await readKeyring())?.wrappedByPasscode.ct;
+    const before = (await readKeyring())?.wrappedByPasscode?.ct;
 
     expect(await changePasscode('not the passcode', 'next one')).toMatchObject({ ok: false });
-    expect((await readKeyring())?.wrappedByPasscode.ct).toBe(before);
+    expect((await readKeyring())?.wrappedByPasscode?.ct).toBe(before);
 
     expect(await changePasscode(PASSCODE, 'a better passcode')).toMatchObject({ ok: true });
     forgetVaultKey();
@@ -666,14 +666,14 @@ describe('export and import', () => {
   it('never replaces a keyring that already exists on the device', async () => {
     await enablePrivacy();
     const bundle = await exportVault();
-    const original = (await readKeyring())?.wrappedByPasscode.ct;
+    const original = (await readKeyring())?.wrappedByPasscode?.ct;
 
     // Still on the same device, which has since changed its own passcode.
     expect(await changePasscode(PASSCODE, 'a different passcode')).toMatchObject({ ok: true });
     const result = await importVault(bundle, 'merge');
 
     expect(result.keyringAdopted).toBe(false);
-    const after = (await readKeyring())?.wrappedByPasscode.ct;
+    const after = (await readKeyring())?.wrappedByPasscode?.ct;
     expect(after).not.toBe(original);
     expect(await unlockWithPasscode('a different passcode')).not.toBeNull();
     expect(await unlockWithPasscode(PASSCODE)).toBeNull();

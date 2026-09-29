@@ -274,11 +274,21 @@ function tagUsageOf(tags: readonly Tag[], linkTags: readonly LinkTag[]): Array<{
  * Read the vault, then apply the lock filter once, centrally.
  *
  * This is the single place "what may be shown right now" is decided. Every
- * screen, picker and count downstream reads the filtered collections, so a new
- * surface inherits the lock rules instead of having to implement them. Counts and
- * recents are derived from the *unfiltered* rows with the hidden sets applied, so
- * a locked folder's contents are excluded from totals rather than merely
- * unrendered.
+ * screen, picker and count downstream reads the same collections, so a new
+ * surface inherits the lock rules instead of having to implement them.
+ *
+ * **A locked item is still listed; what it loses is everything but its shape.**
+ * That is the product decision behind the placeholders: a locked note shows as a
+ * locked row rather than vanishing, so tapping it can offer the device prompt —
+ * which is how every other app with a screen lock behaves, and the only way
+ * "open the locked thing" can be an interaction at all. What makes it safe is
+ * that the row on disk is already ciphertext with its fields blanked: there is no
+ * plaintext title, URL, name, snippet or note text left to leak, only the fact
+ * that something exists there and where it sits.
+ *
+ * `hidden` is still published, and still means "do not treat this row as
+ * content": search does not return it, dedupe does not match it, and pickers do
+ * not offer it as a destination.
  */
 async function loadEverything() {
   const [snapshot, recentFolderIds] = await Promise.all([getSnapshot(), pruneRecentFolders()]);
@@ -288,14 +298,14 @@ async function loadEverything() {
   const sessionLocked = isSessionLocked();
   const hidden = hiddenIds(protection, sessionLocked);
 
-  const folders = snapshot.folders.filter((folder) => !hidden.folders.has(folder.id));
-  const links = snapshot.links.filter((link) => !hidden.links.has(link.id));
-  const notes = snapshot.notes.filter((note) => !hidden.notes.has(note.id));
+  const folders = snapshot.folders;
+  const links = snapshot.links;
+  const notes = snapshot.notes;
 
-  const folderStats = computeFolderStats(snapshot.folders, snapshot.links, {
-    hiddenFolderIds: hidden.folders,
-    hiddenLinkIds: hidden.links,
-  });
+  // Counts include locked rows: the row is on screen, so "2 links" beside it
+  // has to agree with what the user can see. The *contents* stay unreadable,
+  // which is what the counts were ever protecting.
+  const folderStats = computeFolderStats(snapshot.folders, snapshot.links);
 
   return {
     folders,

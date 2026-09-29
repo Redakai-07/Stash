@@ -3,10 +3,12 @@
 import { ChevronRight, Lock, MoreHorizontal, Star } from 'lucide-react';
 import type { Folder } from '@/db/types';
 import { pluralize } from '@/lib/format';
+import { isSealed } from '@/lib/privacy/protection';
 import { useLongPress } from '@/hooks/use-long-press';
 import { useVaultStore } from '@/stores/vault-store';
 import { cn } from '@/lib/utils';
 import { Icon, isIconName } from '@/components/ui/icon';
+import { LockedRow, useRevealLocked } from '@/components/privacy/locked-row';
 
 /**
  * A folder in a list.
@@ -41,9 +43,24 @@ export function FolderRow({
   // Hold a folder for the same sheet its ⋯ button opens, so every list in the
   // app answers to the same gesture.
   const { handlers, consumeLongPress } = useLongPress(onShowActions);
+  // A sealed folder has no name to show — it was never stored — so the row
+  // becomes the placeholder and the tap asks for the device prompt.
+  const { reveal, busy } = useRevealLocked();
   const meta: string[] = [];
   if (linkCount > 0) meta.push(pluralize(linkCount, 'link'));
   if (childCount > 0) meta.push(pluralize(childCount, 'folder'));
+
+  if (isSealed(folder)) {
+    return (
+      <LockedRow
+        kind="folder"
+        subtitle={meta.length > 0 ? meta.join(' · ') : undefined}
+        busy={busy}
+        onReveal={() => void reveal('folder', folder.id, onOpen)}
+        className={className}
+      />
+    );
+  }
 
   return (
     <div className={cn('flex items-stretch', className)}>

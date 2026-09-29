@@ -228,6 +228,13 @@ export const META_KEYS = {
  */
 export const SECURITY_KEYS = {
   keyring: 'privacy.keyring',
+  /**
+   * The WebAuthn credential this device enrolled for the unlock prompt. Not a
+   * secret — it is an identifier, and the authenticator keeps the private half —
+   * but it belongs here so it never travels in a backup: a credential enrolled
+   * on this machine is meaningless on another one.
+   */
+  deviceCredential: 'privacy.deviceCredential',
 } as const;
 
 /**
@@ -270,18 +277,25 @@ export const DEFAULT_PRIVACY_SETTINGS: PrivacySettings = {
 /** Wrapped (never raw) key material. Everything here is ciphertext or public. */
 export interface KeyringRecord {
   version: 1;
-  /** Parameters needed to re-derive the passcode's wrapping key. */
-  kdf: {
+  /**
+   * Parameters needed to re-derive the passcode's wrapping key.
+   *
+   * Absent when the vault is opened by the device lock alone — locking without
+   * ever typing a Stash passcode is a supported setup, not a degraded one.
+   */
+  kdf?: {
     algorithm: 'PBKDF2-SHA256';
     /** Base64 salt. Public by design; a salt is not a secret. */
     salt: string;
     iterations: number;
   };
   /** The vault key sealed under the passcode-derived key. The recovery path. */
-  wrappedByPasscode: EncryptedPayload;
+  wrappedByPasscode?: EncryptedPayload;
   /**
-   * The vault key sealed under a random key held in Android Keystore-backed
-   * storage. The biometric convenience path. Device-bound: never exported.
+   * The vault key sealed under a random key held in platform secure storage —
+   * the Android Keystore on a phone, or the app's own security table on a
+   * desktop, where there is no keystore to reach for. Device-bound: never
+   * exported.
    */
   wrappedByDevice?: EncryptedPayload;
   createdAt: number;
