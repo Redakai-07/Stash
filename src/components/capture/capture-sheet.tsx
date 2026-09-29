@@ -51,6 +51,20 @@ export function CaptureSheet() {
 
   const open = status !== 'idle';
 
+  /*
+   * A share is a takeover, not a dialog.
+   *
+   * The user left another app with one intention and arrived here by choosing
+   * Stash from the system share sheet. Showing them their own vault first — or a
+   * sheet floating above it — would be answering a question they did not ask.
+   * So a shared capture fills the screen and the shell behind it is not drawn.
+   *
+   * A manual "add a link" is the opposite case: it interrupts something the user
+   * was already doing, so it stays a sheet that can be dismissed back to the page
+   * underneath, with the page still visible behind it.
+   */
+  const fullScreen = mode === 'share';
+
   const close = React.useCallback(() => {
     useCaptureStore.getState().reset();
     setError(null);
@@ -162,6 +176,8 @@ export function CaptureSheet() {
   return (
     <Sheet open onOpenChange={(next) => !next && close()}>
       <SheetContent
+        showHandle={!fullScreen}
+        className={fullScreen ? 'inset-0 max-h-none rounded-none border-t-0 pt-safe' : undefined}
         onOpenAutoFocus={(event) => {
           if (mode === 'manual') {
             event.preventDefault();
@@ -174,7 +190,7 @@ export function CaptureSheet() {
             <div className="min-w-0 flex-1">
               <SheetTitle>{unreadable ? 'Nothing to save' : mode === 'manual' ? 'Add a link' : 'Save link'}</SheetTitle>
               {!unreadable && mode === 'share' && draft?.appLabel ? (
-                <p className="mt-0.5 flex items-center gap-1.5 text-xs text-subtle">
+                <p className="mt-0.5 flex items-center gap-1.5 text-meta text-subtle">
                   <Share2 size={12} strokeWidth={2} aria-hidden />
                   Shared from {draft.appLabel}
                 </p>
@@ -264,7 +280,7 @@ export function CaptureSheet() {
                         <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-accent">
                           <Plus size={17} strokeWidth={2.1} aria-hidden />
                         </span>
-                        <span className="text-[0.9375rem] font-medium text-accent">Create folder</span>
+                        <span className="text-row font-medium text-accent">Create folder</span>
                       </button>
                     }
                   />
@@ -329,7 +345,7 @@ export function CaptureSheet() {
                 </Button>
               ) : null}
 
-              <p className="mt-2 truncate text-center text-xs text-subtle">
+              <p className="mt-2 truncate text-center text-meta text-subtle">
                 {inInbox ? (
                   'No folder yet — organize it later'
                 ) : (
@@ -350,9 +366,7 @@ export function CaptureSheet() {
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="px-3 pt-1 text-[0.6875rem] font-semibold tracking-wider text-subtle uppercase">{children}</h2>
-  );
+  return <h2 className="text-label px-3 pt-1 text-subtle">{children}</h2>;
 }
 
 interface LinkPreviewProps {
@@ -396,11 +410,11 @@ function LinkPreview({
     <div className="mx-3 overflow-hidden rounded-xl border border-border bg-surface-2 p-3">
       <div className="flex flex-wrap items-center gap-1.5">
         {sourceLabel ? (
-          <span className="inline-flex items-center rounded-md bg-accent-soft px-1.5 py-0.5 text-[0.6875rem] font-semibold text-accent">
+          <span className="inline-flex items-center rounded-md bg-accent-soft px-1.5 py-0.5 text-label font-semibold text-accent">
             {sourceLabel}
           </span>
         ) : null}
-        {domain ? <span className="text-xs text-subtle">{domain}</span> : null}
+        {domain ? <span className="text-meta text-subtle">{domain}</span> : null}
       </div>
 
       {manual ? (
@@ -441,17 +455,17 @@ function LinkPreview({
       ) : (
         <div className="mt-1.5">
           {title ? (
-            <p className="line-clamp-3 text-[0.9375rem] leading-snug font-medium text-fg">{title}</p>
+            <p className="line-clamp-3 text-row leading-snug font-medium text-fg">{title}</p>
           ) : (
-            <p className="text-[0.9375rem] leading-snug font-medium text-muted">{displayUrl(url, 80)}</p>
+            <p className="text-row leading-snug font-medium text-muted">{displayUrl(url, 80)}</p>
           )}
-          {note ? <p className="mt-1 line-clamp-2 text-[0.8125rem] leading-snug text-muted">{note}</p> : null}
-          {title ? <p className="mt-1 truncate text-xs text-subtle">{displayUrl(url, 72)}</p> : null}
+          {note ? <p className="mt-1 line-clamp-2 text-meta leading-snug text-muted">{note}</p> : null}
+          {title ? <p className="mt-1 truncate text-meta text-subtle">{displayUrl(url, 72)}</p> : null}
         </div>
       )}
 
       {error ? (
-        <p className="mt-2 rounded-lg bg-danger-soft px-2.5 py-1.5 text-[0.8125rem] leading-snug text-danger">
+        <p className="mt-2 rounded-lg bg-danger-soft px-2.5 py-1.5 text-meta leading-snug text-danger">
           {error}
         </p>
       ) : null}
@@ -474,7 +488,7 @@ function LinkPreview({
           >
             {saveOtherUrls ? <Check size={13} strokeWidth={3} /> : null}
           </span>
-          <span className="min-w-0 flex-1 text-[0.8125rem] text-fg">
+          <span className="min-w-0 flex-1 text-meta text-fg">
             {saveOtherUrls ? 'Saving' : 'Also save'}{' '}
             {otherUrls.length === 1 ? 'the other link' : `${otherUrls.length} other links`} found in this text
           </span>
@@ -505,24 +519,24 @@ function UnreadableShare({
   return (
     <div className="px-3 pb-2">
       <div className="rounded-xl border border-border bg-surface-2 p-3.5">
-        <p className="flex items-center gap-2 text-[0.9375rem] font-semibold text-fg">
+        <p className="flex items-center gap-2 text-row font-semibold text-fg">
           <FolderPlus size={17} strokeWidth={1.9} className="text-subtle" aria-hidden />
           No link in this share
         </p>
-        <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-muted">
+        <p className="mt-1.5 text-meta leading-relaxed text-muted">
           {appLabel ? `${appLabel} sent ` : 'The other app sent '}
           text without a web address. Stash saves links, so there is nothing to file here yet. Your text is
           below and nothing was lost.
         </p>
         {rawText.trim() ? (
           <>
-            <pre className="scroll-area mt-3 max-h-48 overflow-auto rounded-lg bg-surface px-3 py-2.5 text-[0.8125rem] leading-relaxed whitespace-pre-wrap break-words text-muted">
+            <pre className="scroll-area mt-3 max-h-48 overflow-auto rounded-lg bg-surface px-3 py-2.5 text-meta leading-relaxed whitespace-pre-wrap break-words text-muted">
               {rawText}
             </pre>
             <button
               type="button"
               onClick={() => void copy()}
-              className="tap mt-2.5 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[0.8125rem] font-medium text-accent active:bg-accent-soft"
+              className="tap mt-2.5 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-meta font-medium text-accent active:bg-accent-soft"
             >
               <Copy size={14} strokeWidth={2} aria-hidden />
               Copy text

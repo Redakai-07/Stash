@@ -95,7 +95,7 @@ export function TreePickerList({
               enterKeyHint="done"
               autoComplete="off"
               className={cn(
-                'h-10 w-full rounded-xl border border-border bg-surface-2 pr-3 pl-9 text-[0.9375rem] text-fg',
+                'h-10 w-full rounded-xl border border-border bg-surface-2 pr-3 pl-9 text-row text-fg',
                 'placeholder:text-subtle focus:border-accent focus:bg-surface focus:outline-none',
               )}
             />
@@ -116,8 +116,8 @@ export function TreePickerList({
 
         {filtered.length === 0 ? (
           <li className="flex flex-col items-center gap-1 px-4 py-6 text-center">
-            <p className="text-sm text-muted">{items.length === 0 ? emptyTitle : 'Nothing matches that'}</p>
-            {emptyHint ? <p className="text-xs text-subtle">{emptyHint}</p> : null}
+            <p className="text-body text-muted">{items.length === 0 ? emptyTitle : 'Nothing matches that'}</p>
+            {emptyHint ? <p className="text-meta text-subtle">{emptyHint}</p> : null}
           </li>
         ) : null}
       </ul>
@@ -165,22 +165,22 @@ function TreePickerRow({
           )}
         >
           {item.icon ?? (
-            <span className="text-[0.8125rem] font-semibold">{item.label.slice(0, 1).toUpperCase()}</span>
+            <span className="text-meta font-semibold">{item.label.slice(0, 1).toUpperCase()}</span>
           )}
         </span>
         <span className="min-w-0 flex-1">
           <span
             className={cn(
-              'block truncate text-[0.9375rem] leading-tight',
+              'block truncate text-row leading-tight',
               selected ? 'font-semibold text-accent' : 'font-medium text-fg',
             )}
           >
             {item.label}
           </span>
           {item.hint ? (
-            <span className="mt-0.5 block truncate text-xs text-subtle">{item.hint}</span>
+            <span className="mt-0.5 block truncate text-meta text-subtle">{item.hint}</span>
           ) : showPath ? (
-            <span className="mt-0.5 block truncate text-xs text-subtle">{item.path}</span>
+            <span className="mt-0.5 block truncate text-meta text-subtle">{item.path}</span>
           ) : null}
         </span>
         {item.badge}

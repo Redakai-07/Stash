@@ -1,6 +1,5 @@
 'use client';
 
-import * as React from 'react';
 import { ChevronRight, Lock, MoreHorizontal, Star } from 'lucide-react';
 import type { Folder } from '@/db/types';
 import { pluralize } from '@/lib/format';
@@ -9,7 +8,15 @@ import { useVaultStore } from '@/stores/vault-store';
 import { cn } from '@/lib/utils';
 import { Icon, isIconName } from '@/components/ui/icon';
 
-/** A folder in a list: icon, name, and just enough count to orient. */
+/**
+ * A folder in a list.
+ *
+ * The icon the user chose is shown inline and in one colour, because it is
+ * information architecture — it is the little differentiator between "Android"
+ * and "Machine Learning" at a glance. It is *not* shown inside a rounded tile
+ * with its own background: that would turn every row into a card whose loudest
+ * element is decoration.
+ */
 export interface FolderRowProps {
   folder: Folder;
   /** Secondary line, e.g. the full path when shown out of context. */
@@ -39,7 +46,7 @@ export function FolderRow({
   if (childCount > 0) meta.push(pluralize(childCount, 'folder'));
 
   return (
-    <div className={cn('flex items-stretch gap-1 rounded-xl', className)}>
+    <div className={cn('flex items-stretch', className)}>
       <button
         type="button"
         onClick={() => {
@@ -47,20 +54,18 @@ export function FolderRow({
           onOpen();
         }}
         {...handlers}
-        className="tap flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-left active:bg-surface-2"
+        className="tap flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left active:bg-surface-2"
       >
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-muted">
+        <span className="shrink-0 text-subtle">
           {isIconName(folder.icon) ? (
-            <Icon name={folder.icon} size={17} strokeWidth={1.85} />
+            <Icon name={folder.icon} size={19} strokeWidth={1.7} />
           ) : (
-            <span className="text-[0.8125rem] font-bold">{folder.name.slice(0, 1).toUpperCase()}</span>
+            <Icon name="folder" size={19} strokeWidth={1.7} />
           )}
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
-            <span className="min-w-0 truncate text-[0.9375rem] leading-tight font-medium text-fg">
-              {folder.name}
-            </span>
+            <span className="text-row min-w-0 truncate font-medium text-fg">{folder.name}</span>
             {locked ? (
               <Lock size={12} strokeWidth={2.4} className="shrink-0 text-accent" aria-label="Locked folder" />
             ) : null}
@@ -68,18 +73,18 @@ export function FolderRow({
               <Star size={12} strokeWidth={2.4} className="shrink-0 text-warning" aria-label="Favorite folder" />
             ) : null}
           </span>
-          <span className="mt-0.5 block truncate text-xs text-subtle">
+          <span className="text-meta mt-0.5 block truncate text-subtle">
             {subtitle ?? (meta.length > 0 ? meta.join(' · ') : 'Empty')}
           </span>
         </span>
-        <ChevronRight size={17} strokeWidth={2} className="shrink-0 text-subtle" aria-hidden />
+        <ChevronRight size={17} strokeWidth={2} className="shrink-0 text-subtle/70" aria-hidden />
       </button>
 
       <button
         type="button"
         onClick={onShowActions}
         aria-label={`${folder.name} actions`}
-        className="tap mr-0.5 flex w-9 shrink-0 items-center justify-center rounded-full text-subtle active:bg-surface-2"
+        className="tap mr-1 flex w-10 shrink-0 items-center justify-center rounded-full text-subtle active:bg-surface-2"
       >
         <MoreHorizontal size={18} strokeWidth={2} aria-hidden />
       </button>

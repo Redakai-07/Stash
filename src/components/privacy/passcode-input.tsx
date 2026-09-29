@@ -50,7 +50,7 @@ export function PasscodeInput({
 
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
-      <label htmlFor="stash-passcode" className="text-[0.8125rem] font-medium text-muted">
+      <label htmlFor="stash-passcode" className="text-meta font-medium text-muted">
         {label}
       </label>
       <div className="relative">
@@ -90,7 +90,7 @@ export function PasscodeInput({
         </button>
       </div>
       {hint ? (
-        <p className={cn('text-[0.8125rem] leading-relaxed', tone === 'danger' ? 'text-danger' : 'text-subtle')}>
+        <p className={cn('text-meta leading-relaxed', tone === 'danger' ? 'text-danger' : 'text-subtle')}>
           {hint}
         </p>
       ) : null}
@@ -101,7 +101,7 @@ export function PasscodeInput({
 /** What the passcode protects, said plainly wherever one is being set. */
 export function PasscodeReassurance({ className }: { className?: string }) {
   return (
-    <p className={cn('flex items-start gap-2 text-xs leading-relaxed text-subtle', className)}>
+    <p className={cn('flex items-start gap-2 text-meta leading-relaxed text-subtle', className)}>
       <ShieldCheck size={14} strokeWidth={2} className="mt-0.5 shrink-0 text-accent" aria-hidden />
       <span>
         Stash encrypts locked items with a key stored on this device, unlocked by your passcode. There is no

@@ -92,7 +92,7 @@ export const SheetDescription = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
 >(function SheetDescription({ className, ...props }, ref) {
   return (
-    <DialogPrimitive.Description ref={ref} className={cn('mt-1 text-sm text-muted', className)} {...props} />
+    <DialogPrimitive.Description ref={ref} className={cn('mt-1 text-body text-muted', className)} {...props} />
   );
 });
 

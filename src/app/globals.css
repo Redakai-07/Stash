@@ -3,59 +3,112 @@
 /*
  * Stash design tokens.
  *
- * The palette is intentionally restrained: near-black surfaces in dark mode,
- * clean neutrals in light mode, and a single indigo accent used only for the
- * active control or the one primary action on screen. Colour is a signal here,
- * not decoration.
+ * The direction is "index card": a quiet, utilitarian drawer of things worth
+ * keeping. Hierarchy is carried by *type* — size, weight, position — and by
+ * *hairlines*, not by containers, shadows and rounded tiles. If nearly every
+ * border in a screen were removed it should still read.
+ *
+ * Three rules follow from that and everything below serves them:
+ *
+ *  1. **No grey slabs.** Depth comes from a near-invisible surface step plus a
+ *     hairline. Large filled containers are reserved for things that are
+ *     genuinely raised: sheets and toasts.
+ *  2. **Shape means something.** Radius is a vocabulary with three words, not a
+ *     single default applied to everything (see the radius roles below).
+ *  3. **Colour is a signal.** One accent, used only for the action or the
+ *     selection. Semantic red/amber/green appear only where meaning requires.
  */
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --bg: oklch(0.982 0.001 265);
+  /* --- Surfaces -----------------------------------------------------------
+   * `bg` is the paper. `surface` is chrome that sits on it (sheets, bars).
+   * `surface-2` is an inset — a field, a well. The steps are deliberately small:
+   * a large step reads as "grey card floating on the page", which is the look
+   * being avoided.
+   */
+  --bg: oklch(0.975 0.003 265);
   --surface: oklch(1 0 0);
-  --surface-2: oklch(0.964 0.002 265);
-  --surface-3: oklch(0.935 0.003 265);
-  --fg: oklch(0.215 0.01 265);
-  --muted-fg: oklch(0.53 0.012 265);
-  --subtle-fg: oklch(0.655 0.01 265);
-  --border: oklch(0.912 0.004 265);
-  --border-strong: oklch(0.86 0.006 265);
-  --accent: oklch(0.555 0.19 274);
-  --accent-hover: oklch(0.5 0.19 274);
+  --surface-2: oklch(0.958 0.004 265);
+  --surface-3: oklch(0.932 0.005 265);
+
+  /* --- Text ---------------------------------------------------------------
+   * Three weights of ink, each with one job. `muted-fg` is the honest
+   * secondary; `subtle-fg` is metadata only and is never load-bearing.
+   */
+  --fg: oklch(0.225 0.012 265);
+  --muted-fg: oklch(0.5 0.013 265);
+  --subtle-fg: oklch(0.645 0.011 265);
+
+  /* --- Lines --------------------------------------------------------------
+   * `hairline` separates content (a list, a section). `border` outlines a
+   * control the user can touch. Keeping them distinct is what stops every row
+   * from needing a box.
+   */
+  --hairline: oklch(0.9 0.005 265);
+  --border: oklch(0.885 0.006 265);
+  --border-strong: oklch(0.83 0.008 265);
+
+  /* --- Accent -------------------------------------------------------------
+   * Ink-indigo. Used for: the one primary action, the current selection, and
+   * focus. Never for decoration.
+   */
+  --accent: oklch(0.52 0.165 272);
+  --accent-hover: oklch(0.465 0.165 272);
   --accent-fg: oklch(0.995 0 0);
-  --accent-soft: oklch(0.955 0.022 274);
-  --danger: oklch(0.575 0.2 25);
-  --danger-soft: oklch(0.955 0.03 25);
-  --success: oklch(0.6 0.14 155);
-  --warning: oklch(0.7 0.14 75);
-  --overlay: oklch(0.2 0.01 265 / 0.35);
-  --shadow-sheet: 0 -8px 40px oklch(0.2 0.01 265 / 0.16);
-  --shadow-raised: 0 1px 2px oklch(0.2 0.01 265 / 0.06), 0 8px 24px oklch(0.2 0.01 265 / 0.06);
+  --accent-soft: oklch(0.945 0.025 272);
+
+  /* --- Semantic ---------------------------------------------------------- */
+  --danger: oklch(0.55 0.19 27);
+  --danger-soft: oklch(0.95 0.032 27);
+  --success: oklch(0.55 0.13 152);
+  --warning: oklch(0.66 0.13 72);
+
+  --overlay: oklch(0.2 0.012 265 / 0.32);
+  /* One shadow in the system, for surfaces that are genuinely above the page. */
+  --shadow-sheet: 0 -12px 48px oklch(0.2 0.012 265 / 0.14);
+  --shadow-raised: 0 2px 10px oklch(0.2 0.012 265 / 0.1);
+
+  /* --- System chrome ------------------------------------------------------
+   * The air kept between the app's own chrome and the system bars, *on top of*
+   * the safe-area inset. Android paints edge to edge from API 35, so the clock
+   * and the gesture pill sit on top of the app; a few pixels of clear space is
+   * what stops them crowding the page header and the tab bar — which is also
+   * what makes the bars read as the phone's, not the app's.
+   */
+  --chrome-gap: 0.5rem;
   color-scheme: light;
 }
 
 .dark {
-  --bg: oklch(0.148 0.004 265);
-  --surface: oklch(0.198 0.005 265);
-  --surface-2: oklch(0.238 0.006 265);
-  --surface-3: oklch(0.278 0.007 265);
-  --fg: oklch(0.965 0.002 265);
-  --muted-fg: oklch(0.685 0.01 265);
-  --subtle-fg: oklch(0.56 0.01 265);
-  --border: oklch(0.282 0.006 265);
-  --border-strong: oklch(0.35 0.008 265);
-  --accent: oklch(0.685 0.155 274);
-  --accent-hover: oklch(0.73 0.15 274);
-  --accent-fg: oklch(0.17 0.03 274);
-  --accent-soft: oklch(0.268 0.05 274);
-  --danger: oklch(0.685 0.175 25);
-  --danger-soft: oklch(0.27 0.06 25);
-  --success: oklch(0.72 0.14 155);
-  --warning: oklch(0.78 0.13 75);
-  --overlay: oklch(0.08 0 0 / 0.6);
-  --shadow-sheet: 0 -8px 40px oklch(0 0 0 / 0.5);
-  --shadow-raised: 0 1px 2px oklch(0 0 0 / 0.4), 0 8px 24px oklch(0 0 0 / 0.35);
+  --bg: oklch(0.155 0.004 265);
+  --surface: oklch(0.185 0.005 265);
+  --surface-2: oklch(0.212 0.006 265);
+  --surface-3: oklch(0.248 0.007 265);
+
+  /* Not pure white, and not pure black behind it. */
+  --fg: oklch(0.955 0.003 265);
+  --muted-fg: oklch(0.7 0.011 265);
+  --subtle-fg: oklch(0.575 0.011 265);
+
+  --hairline: oklch(0.268 0.006 265);
+  --border: oklch(0.3 0.007 265);
+  --border-strong: oklch(0.375 0.009 265);
+
+  --accent: oklch(0.72 0.135 272);
+  --accent-hover: oklch(0.78 0.125 272);
+  --accent-fg: oklch(0.17 0.03 272);
+  --accent-soft: oklch(0.27 0.045 272);
+
+  --danger: oklch(0.68 0.17 27);
+  --danger-soft: oklch(0.268 0.055 27);
+  --success: oklch(0.7 0.13 152);
+  --warning: oklch(0.76 0.12 72);
+
+  --overlay: oklch(0.08 0 0 / 0.62);
+  --shadow-sheet: 0 -12px 48px oklch(0 0 0 / 0.55);
+  --shadow-raised: 0 2px 12px oklch(0 0 0 / 0.45);
   color-scheme: dark;
 }
 
@@ -67,6 +120,7 @@
   --color-fg: var(--fg);
   --color-muted: var(--muted-fg);
   --color-subtle: var(--subtle-fg);
+  --color-hairline: var(--hairline);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-accent: var(--accent);
@@ -79,8 +133,50 @@
   --color-warning: var(--warning);
   --color-overlay: var(--overlay);
 
-  --radius-card: 1rem;
-  --radius-sheet: 1.5rem;
+  /*
+   * --- Type scale ---------------------------------------------------------
+   * Six steps, each with one job. New UI picks a step; it does not pick a
+   * number. A seventh size is how a design language dissolves.
+   *
+   *   display  21px  page title, one per screen
+   *   title    16px  sheet titles, dialog headings
+   *   row      15px  list-item titles (the most common text in the app)
+   *   body     14px  prose the user reads or writes
+   *   meta     13px  the secondary line under a row title
+   *   label    12px  section labels — sentence case, never uppercased
+   */
+  --text-display: 1.3125rem;
+  --text-display--line-height: 1.2;
+  --text-display--letter-spacing: -0.02em;
+  --text-title: 1rem;
+  --text-title--line-height: 1.3;
+  --text-title--letter-spacing: -0.011em;
+  --text-row: 0.9375rem;
+  --text-row--line-height: 1.35;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.5;
+  --text-meta: 0.8125rem;
+  --text-meta--line-height: 1.4;
+  --text-label: 0.75rem;
+  --text-label--line-height: 1.3;
+
+  /*
+   * --- Radius roles -------------------------------------------------------
+   * Three words. `tap` is a control that sits *inside* content. `control` is a
+   * button or a field. `surface` is an overlay, and only an overlay. Content
+   * rows and grouped lists are square and separated by a hairline — that is the
+   * fourth role, and it is expressed by the absence of a class.
+   */
+  --radius-tap: 0.5rem;
+  --radius-control: 0.625rem;
+  --radius-surface: 1rem;
+
+  /* Tailwind's stock steps are retuned so a stray `rounded-xl` cannot
+   * reintroduce a fourth, louder shape. */
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.625rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.25rem;
 
   --shadow-sheet: var(--shadow-sheet);
   --shadow-raised: var(--shadow-raised);
@@ -89,13 +185,20 @@
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif,
     'Apple Color Emoji', 'Segoe UI Emoji';
 
+  /*
+   * --- Motion -------------------------------------------------------------
+   * Only four animations exist, and each has a physical origin: a sheet rises
+   * from the bottom edge, an overlay fades, a menu pops from where it was
+   * summoned, and a confirmation arrives. Nothing scales in for decoration and
+   * nothing bounces — overshoot reads as dated. All of it collapses under
+   * `prefers-reduced-motion` (see the end of this file).
+   */
   --animate-sheet-in: sheet-in 240ms cubic-bezier(0.32, 0.72, 0, 1);
   --animate-sheet-out: sheet-out 180ms cubic-bezier(0.32, 0.72, 0, 1);
   --animate-overlay-in: overlay-in 200ms ease-out;
   --animate-overlay-out: overlay-out 160ms ease-in;
-  --animate-pop-in: pop-in 200ms cubic-bezier(0.32, 0.72, 0, 1);
-  --animate-rise: rise 260ms cubic-bezier(0.32, 0.72, 0, 1);
-  --animate-check: check 320ms ease-out;
+  --animate-pop-in: pop-in 160ms cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-rise: rise 200ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 @keyframes sheet-in {
@@ -134,10 +237,11 @@
   }
 }
 
+/* Origin-correct: a menu appears where it was summoned, not from nowhere. */
 @keyframes pop-in {
   from {
     opacity: 0;
-    transform: scale(0.94);
+    transform: scale(0.97);
   }
   to {
     opacity: 1;
@@ -145,29 +249,15 @@
   }
 }
 
+/* A toast rises from the edge it belongs to. No scale, no overshoot. */
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-@keyframes check {
-  0% {
-    transform: scale(0.6);
-    opacity: 0;
-  }
-  60% {
-    transform: scale(1.08);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
   }
 }
 
@@ -188,6 +278,8 @@
     background-color: var(--bg);
     color: var(--fg);
     font-family: var(--font-sans);
+    /* Optical correction for a system stack; without it body text looks loose. */
+    letter-spacing: -0.006em;
     overflow: hidden;
     overscroll-behavior: none;
     -webkit-tap-highlight-color: transparent;
@@ -228,16 +320,52 @@
   }
 }
 
-@utility pb-safe {
-  padding-bottom: env(safe-area-inset-bottom);
+/*
+ * Insets.
+ *
+ * Two sources, one expression. On Android, Capacitor's SystemBars plugin
+ * (bundled with @capacitor/core) publishes the insets as `--safe-area-inset-*`:
+ * those are the values that stay correct on every WebView version, including
+ * the older ones where `env()` reports zero and Capacitor pads the WebView
+ * natively instead. iOS and the browser have no such variable, so the custom
+ * property falls back to the standard `env()` value, and desktop falls back to
+ * zero. Because Capacitor zeroes the variables whenever it decides to pad
+ * natively, the app never pads twice.
+ *
+ * `pt-safe` / `pb-safe` add `--chrome-gap` on top: those are the two edges
+ * where the app's own chrome (header, tab bar, sheet footer) meets a system
+ * bar. `px-safe` is for landscape cutouts and adds nothing of its own.
+ */
+@utility pt-safe {
+  padding-top: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + var(--chrome-gap));
 }
 
-@utility pt-safe {
-  padding-top: env(safe-area-inset-top);
+@utility pb-safe {
+  padding-bottom: calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + var(--chrome-gap));
+}
+
+@utility px-safe {
+  padding-inline: var(--safe-area-inset-left, env(safe-area-inset-left, 0px))
+    var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
 }
 
 @utility mb-safe {
-  margin-bottom: env(safe-area-inset-bottom);
+  margin-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+}
+
+/*
+ * A hairline rule. 1px regardless of device pixel ratio, and quiet enough to
+ * group content without drawing a box around it.
+ */
+@utility rule {
+  border-bottom: 1px solid var(--hairline);
+}
+
+/** Remove the rule from the last item in a list. */
+@utility rule-last {
+  &:last-child {
+    border-bottom-color: transparent;
+  }
 }
 
 /* Tap feedback that does not rely on hover, which phones do not have. */

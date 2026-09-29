@@ -72,7 +72,7 @@ export function ExportPanel() {
 
   return (
     <div className="mx-4 flex flex-col gap-3">
-      <div className="overflow-hidden rounded-2xl border border-border bg-surface" role="radiogroup" aria-label="Backup type">
+      <div className="overflow-hidden rounded-control border border-hairline bg-surface" role="radiogroup" aria-label="Backup type">
         {BACKUP_MODES.map((option, index) => {
           const active = option.id === mode;
           return (
@@ -101,10 +101,10 @@ export function ExportPanel() {
                 {active ? <span className="h-2.5 w-2.5 rounded-full bg-accent" /> : null}
               </span>
               <span className="min-w-0">
-                <span className={cn('block text-[0.9375rem] font-medium', active ? 'text-accent' : 'text-fg')}>
+                <span className={cn('block text-row font-medium', active ? 'text-accent' : 'text-fg')}>
                   {option.label}
                 </span>
-                <span className="mt-0.5 block text-xs leading-relaxed text-muted">{option.description}</span>
+                <span className="mt-0.5 block text-meta leading-relaxed text-muted">{option.description}</span>
               </span>
             </button>
           );
@@ -129,7 +129,7 @@ export function ExportPanel() {
             autoComplete="new-password"
             aria-label="Confirm backup passphrase"
           />
-          <p className="px-1 text-xs leading-relaxed text-subtle">
+          <p className="px-1 text-meta leading-relaxed text-subtle">
             This passphrase protects the file itself, and is separate from your Stash passcode. There is no
             recovery code: if it is lost, the file cannot be opened again — not by you, and not by Stash.
           </p>
@@ -137,7 +137,7 @@ export function ExportPanel() {
       ) : null}
 
       {chosen?.id === 'sealed' && lockedCount > 0 ? (
-        <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-subtle">
+        <p className="flex items-start gap-2 px-1 text-meta leading-relaxed text-subtle">
           <ShieldCheck size={14} strokeWidth={2} className="mt-0.5 shrink-0" aria-hidden />
           {lockedCount} locked item(s) stay encrypted in the file, along with the wrapped key that opens them.
           Restoring them anywhere needs your Stash passcode — so keep the file and the passcode separately.
@@ -145,7 +145,7 @@ export function ExportPanel() {
       ) : null}
 
       {chosen?.id === 'plaintext' && lockedCount > 0 ? (
-        <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-danger">
+        <p className="flex items-start gap-2 px-1 text-meta leading-relaxed text-danger">
           <AlertTriangle size={14} strokeWidth={2} className="mt-0.5 shrink-0" aria-hidden />
           Everything readable means exactly that: your {lockedCount} locked item(s) are written out in plain text.
           Anyone who gets this file reads all of it.
@@ -153,13 +153,13 @@ export function ExportPanel() {
       ) : null}
 
       {plaintextNeedsUnlock ? (
-        <p className="px-1 text-xs leading-relaxed text-danger">
+        <p className="px-1 text-meta leading-relaxed text-danger">
           Unlock Stash first. A fully readable export has to open every locked item, and it will not write a file
           that claims to be readable while hiding parts of it.
         </p>
       ) : null}
 
-      {error ? <p className="px-1 text-xs leading-relaxed text-danger">{error}</p> : null}
+      {error ? <p className="px-1 text-meta leading-relaxed text-danger">{error}</p> : null}
 
       <Button
         variant="primary"
@@ -176,13 +176,13 @@ export function ExportPanel() {
       </Button>
 
       {exportedName && !busy ? (
-        <p className="px-1 text-xs leading-relaxed text-subtle">
+        <p className="px-1 text-meta leading-relaxed text-subtle">
           {exportPath
             ? `Written as ${exportedName} and handed to the share sheet, so you choose where it goes.`
             : `${exportedName} is ready. Stash does not pick a location for you — the system share sheet does.`}
         </p>
       ) : null}
-      {message && !busy ? <p className="px-1 text-xs leading-relaxed text-danger">{message}</p> : null}
+      {message && !busy ? <p className="px-1 text-meta leading-relaxed text-danger">{message}</p> : null}
     </div>
   );
 }

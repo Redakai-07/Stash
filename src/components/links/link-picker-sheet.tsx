@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Check, Link2, Search } from 'lucide-react';
 import type { SavedLink } from '@/db/types';
-import { displayUrl, tintForId } from '@/lib/format';
+import { displayUrl } from '@/lib/format';
 import { folderPathLabel } from '@/lib/tree';
 import { useBackDismiss } from '@/hooks/use-back-dismiss';
 import { useVaultStore } from '@/stores/vault-store';
@@ -62,7 +62,7 @@ export function LinkPickerSheet({ open, onClose, onPick, attachedIds, title = 'A
       <SheetContent>
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
-          <p className="mt-0.5 text-xs text-subtle">Links already in your vault. Nothing is copied.</p>
+          <p className="mt-0.5 text-meta text-subtle">Links already in your vault. Nothing is copied.</p>
         </SheetHeader>
 
         <div className="px-3 pb-2">
@@ -81,7 +81,7 @@ export function LinkPickerSheet({ open, onClose, onPick, attachedIds, title = 'A
               enterKeyHint="search"
               autoComplete="off"
               className={cn(
-                'h-11 w-full rounded-xl border border-border bg-surface-2 pr-3 pl-9 text-[0.9375rem] text-fg',
+                'h-11 w-full rounded-xl border border-border bg-surface-2 pr-3 pl-9 text-row text-fg',
                 'placeholder:text-subtle focus:border-accent focus:bg-surface focus:outline-none',
               )}
             />
@@ -92,18 +92,17 @@ export function LinkPickerSheet({ open, onClose, onPick, attachedIds, title = 'A
           {results.length === 0 ? (
             <div className="flex flex-col items-center gap-1.5 px-8 py-10 text-center">
               <Link2 size={20} strokeWidth={1.7} className="text-subtle" aria-hidden />
-              <p className="text-sm text-muted">
+              <p className="text-body text-muted">
                 {links.length === 0 ? 'No saved links yet' : 'No link matches that'}
               </p>
-              <p className="text-xs text-subtle">
+              <p className="text-meta text-subtle">
                 Save it from another app first, then attach it to a note.
               </p>
             </div>
           ) : (
-            <ul className="flex flex-col gap-0.5 px-1 pb-2">
+            <ul className="flex flex-col divide-y divide-hairline">
               {results.map((link) => {
                 const isAttached = attached.has(link.id);
-                const tint = tintForId(link.source ?? link.id);
                 return (
                   <li key={link.id}>
                     <button
@@ -111,23 +110,15 @@ export function LinkPickerSheet({ open, onClose, onPick, attachedIds, title = 'A
                       disabled={isAttached}
                       onClick={() => onPick(link)}
                       className={cn(
-                        'tap flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left active:bg-surface-2',
+                        'tap flex w-full items-center px-3 py-3 text-left active:bg-surface-2',
                         isAttached && 'opacity-45',
                       )}
                     >
-                      <span
-                        className={cn(
-                          'flex size-9 shrink-0 items-center justify-center rounded-xl text-[0.8125rem] font-bold',
-                          tint === 'accent' ? 'bg-accent-soft text-accent' : 'bg-surface-2 text-muted',
-                        )}
-                      >
-                        {(link.source ?? 'link').replace(/^www\./, '').slice(0, 1).toUpperCase()}
-                      </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[0.9375rem] leading-tight font-medium text-fg">
+                        <span className="text-row block truncate font-medium text-fg">
                           {link.title?.trim() || displayUrl(link.url, 48)}
                         </span>
-                        <span className="mt-0.5 block truncate text-xs text-subtle">
+                        <span className="text-meta mt-0.5 block truncate text-subtle">
                           {folderPathLabel(folders, link.folderId)} · {link.source ?? displayUrl(link.url, 32)}
                         </span>
                       </span>

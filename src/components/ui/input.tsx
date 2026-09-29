@@ -8,7 +8,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
       <input
         ref={ref}
         className={cn(
-          'h-12 w-full rounded-xl border border-border bg-surface-2 px-3.5 text-[1.0625rem] text-fg',
+          'h-12 w-full rounded-xl border border-border bg-surface-2 px-3.5 text-title text-fg',
           'placeholder:text-subtle transition-colors',
           'focus:border-accent focus:bg-surface focus:outline-none',
           'disabled:opacity-50',
@@ -26,7 +26,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTML
       <textarea
         ref={ref}
         className={cn(
-          'w-full resize-none rounded-xl border border-border bg-surface-2 px-3.5 py-3 text-[1.0625rem] text-fg',
+          'w-full resize-none rounded-xl border border-border bg-surface-2 px-3.5 py-3 text-title text-fg',
           'placeholder:text-subtle transition-colors',
           'focus:border-accent focus:bg-surface focus:outline-none',
           className,
@@ -40,7 +40,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTML
 export function Label({ className, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) {
   return (
     <label
-      className={cn('block text-[0.8125rem] font-medium tracking-wide text-muted uppercase', className)}
+      className={cn('block text-label font-medium text-muted', className)}
       {...props}
     />
   );

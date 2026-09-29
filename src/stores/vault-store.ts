@@ -138,6 +138,22 @@ export interface VaultState {
    */
   inboxLinks: SavedLink[];
   /**
+   * Derived collections, computed once per refresh.
+   *
+   * These exist as state rather than as selectors that build an array on the
+   * spot, and that is a correctness requirement, not a micro-optimisation. A
+   * zustand selector that returns a fresh array on every call breaks React's
+   * store subscription: the snapshot never compares equal, so the component
+   * re-renders in a loop and React refuses the update. Precomputing gives every
+   * read the same reference until the vault actually changes, and it also means
+   * no screen has to walk the link list to answer a question Home already asked.
+   */
+  favoriteFolders: Folder[];
+  favoriteNotes: Note[];
+  tagUsage: Array<{ name: string; count: number }>;
+  /** Tag names per link. A Map so a lookup is O(1) and returns a stable ref. */
+  tagsByLink: Map<string, string[]>;
+  /**
    * What is in the trash, grouped into the acts that produced it.
    *
    * The trash is deliberately outside the snapshot: trash-aware filtering
@@ -217,6 +233,44 @@ function inboxOf(links: readonly SavedLink[]): SavedLink[] {
 }
 
 /**
+ * A shared "no tags" value.
+ *
+ * Returned for every untagged link so the answer is one stable reference rather
+ * than a fresh empty array per read — the same reasoning as the derived
+ * collections above. It is never written to.
+ */
+const NO_TAGS: string[] = [];
+
+/** Tag names per link id, each list sorted so the display order is stable. */
+function tagNamesByLink(tags: readonly Tag[], linkTags: readonly LinkTag[]): Map<string, string[]> {
+  const namesById = new Map(tags.map((tag) => [tag.id, tag.name]));
+  const byLink = new Map<string, string[]>();
+  for (const row of linkTags) {
+    const name = namesById.get(row.tagId);
+    if (!name) continue;
+    const bucket = byLink.get(row.linkId);
+    if (bucket) bucket.push(name);
+    else byLink.set(row.linkId, [name]);
+  }
+  for (const names of byLink.values()) names.sort();
+  return byLink;
+}
+
+/** Tag names in use, with how many live links carry each, most used first. */
+function tagUsageOf(tags: readonly Tag[], linkTags: readonly LinkTag[]): Array<{ name: string; count: number }> {
+  const namesById = new Map(tags.map((tag) => [tag.id, tag.name]));
+  const counts = new Map<string, number>();
+  for (const row of linkTags) {
+    const name = namesById.get(row.tagId);
+    if (!name) continue;
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => (b.count !== a.count ? b.count - a.count : a.name.localeCompare(b.name)));
+}
+
+/**
  * Read the vault, then apply the lock filter once, centrally.
  *
  * This is the single place "what may be shown right now" is decided. Every
@@ -257,6 +311,12 @@ async function loadEverything() {
     sessionLocked,
     hidden,
     inboxLinks: inboxOf(links),
+    favoriteFolders: folders.filter((folder) => folder.isFavorite),
+    favoriteNotes: [...visibleNotes(notes)]
+      .filter((note) => note.isFavorite)
+      .sort((a, b) => b.updatedAt - a.updatedAt),
+    tagUsage: tagUsageOf(tags, snapshot.linkTags),
+    tagsByLink: tagNamesByLink(tags, snapshot.linkTags),
   };
 }
 
@@ -275,6 +335,10 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   sessionLocked: false,
   hidden: { folders: new Set(), notes: new Set(), links: new Set() },
   inboxLinks: [],
+  favoriteFolders: [],
+  favoriteNotes: [],
+  tagUsage: [],
+  tagsByLink: new Map(),
   trashGroups: [],
   trashLoaded: false,
 
@@ -673,40 +737,30 @@ export function selectUnavailableLinks(state: VaultState): SavedLink[] {
   return state.links.filter((link) => link.isUnavailable && !link.isArchived);
 }
 
-/** Favorite notes, newest first, for the Favorites surface. */
+/** Favorite notes, newest first. Precomputed, so the reference is stable. */
 export function selectFavoriteNotes(state: VaultState): Note[] {
-  return state.visibleNotes
-    .filter((note) => note.isFavorite)
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+  return state.favoriteNotes;
 }
 
-/** Favorite folders, in the order the library shows them. */
+/** Favorite folders, in the order the library shows them. Precomputed. */
 export function selectFavoriteFolders(state: VaultState): Folder[] {
-  return state.folders.filter((folder) => folder.isFavorite);
+  return state.favoriteFolders;
 }
 
-/** Tag names in use, with how many live links carry each one. */
+/**
+ * Tag names in use, with how many live links carry each one. Precomputed.
+ *
+ * Returns the same array until the vault changes, which is what lets a screen
+ * subscribe to it directly — see the note on the derived collections in
+ * {@link VaultState}.
+ */
 export function selectTagUsage(state: VaultState): Array<{ name: string; count: number }> {
-  const namesById = new Map(state.tags.map((tag) => [tag.id, tag.name]));
-  const counts = new Map<string, number>();
-  for (const row of state.linkTags) {
-    const name = namesById.get(row.tagId);
-    if (!name) continue;
-    counts.set(name, (counts.get(name) ?? 0) + 1);
-  }
-  return [...counts.entries()]
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => (b.count !== a.count ? b.count - a.count : a.name.localeCompare(b.name)));
+  return state.tagUsage;
 }
 
-/** Tag names for one link, alphabetically. */
+/** Tag names for one link, alphabetically. A stable lookup, never a new array. */
 export function selectTagsForLink(state: VaultState, linkId: string): string[] {
-  const namesById = new Map(state.tags.map((tag) => [tag.id, tag.name]));
-  return state.linkTags
-    .filter((row) => row.linkId === linkId)
-    .map((row) => namesById.get(row.tagId))
-    .filter((name): name is string => Boolean(name))
-    .sort();
+  return state.tagsByLink.get(linkId) ?? NO_TAGS;
 }
 
 export { getRecentFolderIds, inboxOf };

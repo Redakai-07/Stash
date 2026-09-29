@@ -80,7 +80,7 @@ export default function SettingsPage() {
       </PageHeader>
 
       <Section title="Appearance">
-        <div className="mx-4 rounded-2xl border border-border bg-surface p-1">
+        <div className="mx-4 rounded-control border border-hairline bg-surface p-1">
           <div className="flex gap-1">
             {THEME_OPTIONS.map((option) => {
               const OptionIcon = option.icon;
@@ -92,7 +92,7 @@ export default function SettingsPage() {
                   onClick={() => void setMode(option.id)}
                   aria-pressed={active}
                   className={cn(
-                    'tap flex flex-1 flex-col items-center gap-1 rounded-xl py-3 text-xs font-medium',
+                    'tap flex flex-1 flex-col items-center gap-1 rounded-xl py-3 text-meta font-medium',
                     active ? 'bg-accent-soft text-accent' : 'text-muted active:bg-surface-2',
                   )}
                 >
@@ -108,7 +108,7 @@ export default function SettingsPage() {
       <PrivacySettings />
 
       <Section title="Your vault">
-        <div className="mx-4 overflow-hidden rounded-2xl border-border bg-surface border">
+        <div className="mx-4 overflow-hidden rounded-control border-border bg-surface border">
           <StatRow label="Saved links" value={pluralize(activeLinks.length, 'link')} />
           <StatRow label="Notes" value={pluralize(notes.length, 'note')} />
           <StatRow label="With your own note" value={pluralize(withNotes, 'link')} />
@@ -126,12 +126,12 @@ export default function SettingsPage() {
         <div className="mx-4 mt-3 flex flex-col gap-2">
           <Link
             href="/inbox"
-            className="tap flex items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 active:bg-surface-2"
+            className="tap flex items-center gap-3 rounded-xl border border-hairline bg-surface px-3.5 py-3 active:bg-surface-2"
           >
             <Inbox size={18} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden />
             <span className="min-w-0 flex-1">
-              <span className="block text-[0.9375rem] font-medium text-fg">Inbox</span>
-              <span className="block text-xs text-subtle">
+              <span className="block text-row font-medium text-fg">Inbox</span>
+              <span className="block text-meta text-subtle">
                 {inboxCount === 0 ? 'Nothing waiting to be organized' : `${inboxCount} to file`}
               </span>
             </span>
@@ -139,12 +139,12 @@ export default function SettingsPage() {
           </Link>
           <Link
             href="/search?filter=archived"
-            className="tap flex items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 active:bg-surface-2"
+            className="tap flex items-center gap-3 rounded-xl border border-hairline bg-surface px-3.5 py-3 active:bg-surface-2"
           >
             <Archive size={18} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden />
             <span className="min-w-0 flex-1">
-              <span className="block text-[0.9375rem] font-medium text-fg">Archive</span>
-              <span className="block text-xs text-subtle">
+              <span className="block text-row font-medium text-fg">Archive</span>
+              <span className="block text-meta text-subtle">
                 {archived === 0 ? 'Nothing archived' : `${pluralize(archived, 'thing')} kept out of the way`}
               </span>
             </span>
@@ -152,12 +152,12 @@ export default function SettingsPage() {
           </Link>
           <Link
             href="/trash"
-            className="tap flex items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-3 active:bg-surface-2"
+            className="tap flex items-center gap-3 rounded-xl border border-hairline bg-surface px-3.5 py-3 active:bg-surface-2"
           >
             <RotateCcw size={18} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden />
             <span className="min-w-0 flex-1">
-              <span className="block text-[0.9375rem] font-medium text-fg">Trash</span>
-              <span className="block text-xs text-subtle">
+              <span className="block text-row font-medium text-fg">Trash</span>
+              <span className="block text-meta text-subtle">
                 {trashCount === 0
                   ? 'Everything you delete can be restored'
                   : `${pluralize(trashCount, 'thing')} you can restore`}
@@ -166,7 +166,7 @@ export default function SettingsPage() {
             <ChevronRight size={17} strokeWidth={2} className="shrink-0 text-subtle" aria-hidden />
           </Link>
         </div>
-        <p className="flex items-start gap-2 px-5 pt-2.5 text-xs leading-relaxed text-subtle">
+        <p className="flex items-start gap-2 px-5 pt-2.5 text-meta leading-relaxed text-subtle">
           <Shield size={14} strokeWidth={2} className="mt-0.5 shrink-0" aria-hidden />
           Nothing here is uploaded. There is no account and no server, so the vault works exactly the same in
           airplane mode.
@@ -181,12 +181,12 @@ export default function SettingsPage() {
             <Upload size={18} strokeWidth={1.9} aria-hidden />
             Restore from a backup
           </Button>
-          <p className="px-1 text-xs leading-relaxed text-subtle">
+          <p className="px-1 text-meta leading-relaxed text-subtle">
             Opens the system file picker. The file is checked completely — format, version, structure and every
             reference — before anything in your vault is touched, and you are shown what a restore would change
             before agreeing to it.
           </p>
-          <p className="px-1 text-xs leading-relaxed text-subtle">
+          <p className="px-1 text-meta leading-relaxed text-subtle">
             &ldquo;Add what is missing&rdquo; never overwrites: an item that is already here is left alone, so importing the
             same file twice cannot duplicate or damage anything. &ldquo;Replace everything&rdquo; clears the vault first and
             writes a safety copy you can restore from.
@@ -195,15 +195,15 @@ export default function SettingsPage() {
       </Section>
 
       <Section title="Danger zone" className="pb-10">
-        <div className="mx-4 rounded-2xl border border-danger/30 bg-danger-soft p-4">
-          <p className="text-[0.9375rem] font-semibold text-danger">Erase everything</p>
-          <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-fg/80">
+        <div className="mx-4 rounded-control border border-danger/30 bg-danger-soft p-4">
+          <p className="text-row font-semibold text-danger">Erase everything</p>
+          <p className="mt-1.5 text-meta leading-relaxed text-fg/80">
             Deletes {pluralize(activeLinks.length, 'link')}, {pluralize(notes.length, 'note')} and{' '}
             {pluralize(folders.length, 'folder')} from this device, including anything in the trash. Export first
             if you want a copy — this cannot be undone.
           </p>
           <div className="mt-3.5 flex items-center justify-between gap-3">
-            <span className="text-[0.8125rem] font-medium text-fg">I understand this is permanent</span>
+            <span className="text-meta font-medium text-fg">I understand this is permanent</span>
             <Switch
               checked={confirmErase}
               onCheckedChange={(value) => setConfirmErase(value)}
@@ -223,7 +223,7 @@ export default function SettingsPage() {
       </Section>
 
       <div className="px-5 pb-8">
-        <p className="flex items-center gap-1.5 text-xs text-subtle">
+        <p className="flex items-center gap-1.5 text-meta text-subtle">
           <AlertTriangle size={13} strokeWidth={2} aria-hidden />
           Stash v0.1 · offline vault for links and notes
         </p>
@@ -246,7 +246,7 @@ function StatRow({ label, value, last = false }: { label: string; value: string;
   return (
     <div
       className={cn(
-        'flex items-center justify-between px-4 py-3 text-[0.9375rem]',
+        'flex items-center justify-between px-4 py-3 text-row',
         !last && 'border-b border-border',
       )}
     >

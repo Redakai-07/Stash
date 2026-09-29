@@ -28,11 +28,11 @@ export function MarkdownView({ content, onToggleChecklist, className }: Markdown
   const blocks = React.useMemo(() => parseMarkdown(content), [content]);
 
   if (content.trim().length === 0) {
-    return <p className={cn('text-[0.9375rem] text-subtle italic', className)}>Nothing written yet.</p>;
+    return <p className={cn('text-row text-subtle italic', className)}>Nothing written yet.</p>;
   }
 
   return (
-    <div className={cn('flex flex-col gap-3 text-[0.9375rem] leading-relaxed text-fg', className)}>
+    <div className={cn('flex flex-col gap-3 text-row leading-relaxed text-fg', className)}>
       {blocks.map((block, index) => (
         <Block
           key={`${block.kind}-${block.line}-${index}`}
@@ -54,12 +54,12 @@ function Block({
   switch (block.kind) {
     case 'heading': {
       const sizes: Record<number, string> = {
-        1: 'text-[1.375rem] font-semibold tracking-tight',
-        2: 'text-[1.1875rem] font-semibold tracking-tight',
-        3: 'text-[1.0625rem] font-semibold',
-        4: 'text-[1rem] font-semibold',
-        5: 'text-[0.9375rem] font-semibold',
-        6: 'text-[0.875rem] font-semibold text-muted',
+        1: 'text-display font-semibold tracking-tight',
+        2: 'text-title font-semibold tracking-tight',
+        3: 'text-title font-semibold',
+        4: 'text-title font-semibold',
+        5: 'text-row font-semibold',
+        6: 'text-body font-semibold text-muted',
       };
       const Tag = (`h${block.level}` as unknown) as 'h1';
       return (
@@ -88,7 +88,7 @@ function Block({
 
     case 'code':
       return (
-        <pre className="scroll-area overflow-x-auto rounded-xl border border-border bg-surface-2 px-3.5 py-3 text-[0.8125rem] leading-relaxed">
+        <pre className="scroll-area overflow-x-auto rounded-xl border border-border bg-surface-2 px-3.5 py-3 text-meta leading-relaxed">
           <code className="font-mono whitespace-pre text-fg">{block.code}</code>
         </pre>
       );
@@ -105,9 +105,9 @@ function Block({
               {item.checked === null ? (
                 <span className="mt-[0.4em] shrink-0 text-subtle" aria-hidden>
                   {block.ordered ? (
-                    <span className="text-[0.8125rem] font-medium tabular-nums">{block.start + index}.</span>
+                    <span className="text-meta font-medium tabular-nums">{block.start + index}.</span>
                   ) : (
-                    <span className="text-[0.9375rem] leading-none">•</span>
+                    <span className="text-row leading-none">•</span>
                   )}
                 </span>
               ) : (

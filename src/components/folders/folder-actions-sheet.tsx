@@ -24,6 +24,7 @@ import { folderDigest, shareOut } from '@/lib/share/share-out';
 import { useBackDismiss } from '@/hooks/use-back-dismiss';
 import { useVaultStore } from '@/stores/vault-store';
 import { usePrivacyStore } from '@/stores/privacy-store';
+import { ActionList, ActionRow } from '@/components/ui/action-list';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
@@ -234,7 +235,7 @@ export function FolderActionsSheet({ folder, onClose, onDeleted }: FolderActions
                         ? 'New subfolder'
                         : folder.name}
               </SheetTitle>
-              <p className="mt-0.5 truncate text-xs text-subtle">
+              <p className="mt-0.5 truncate text-meta text-subtle">
                 {mode === 'actions' ? `${parentLabel} · ${pluralize(impact?.total ?? 0, 'link')}` : folderPathLabel(folders, folder.id)}
               </p>
             </div>
@@ -297,7 +298,7 @@ export function FolderActionsSheet({ folder, onClose, onDeleted }: FolderActions
                 ))}
               </div>
               {error ? (
-                <p className="rounded-lg bg-danger-soft px-3 py-2 text-[0.8125rem] text-danger">{error}</p>
+                <p className="rounded-lg bg-danger-soft px-3 py-2 text-meta text-danger">{error}</p>
               ) : null}
             </div>
           ) : mode === 'move' ? (
@@ -309,10 +310,10 @@ export function FolderActionsSheet({ folder, onClose, onDeleted }: FolderActions
               filterPlaceholder="Find a destination"
             />
           ) : mode === 'delete' ? (
-            <div className="flex flex-col gap-3 px-3 pb-2">
-              <div className="rounded-xl border border-border bg-surface-2 p-3.5">
-                <p className="text-[0.9375rem] font-semibold text-fg">“{folder.name}” contains</p>
-                <ul className="mt-2 flex flex-col gap-1 text-[0.8125rem] text-muted">
+            <div className="flex flex-col gap-3 px-4 pb-2">
+              <div className="pt-3">
+                <p className="text-row font-semibold text-fg">“{folder.name}” contains</p>
+                <ul className="text-meta mt-1.5 flex flex-col gap-1 text-muted">
                   <li>· {pluralize(impact?.direct ?? 0, 'link')} directly in this folder</li>
                   <li>· {pluralize(impact?.nested ?? 0, 'link')} in its subfolders</li>
                   <li>· {pluralize(impact?.descendants ?? 0, 'subfolder')}</li>
@@ -340,7 +341,7 @@ export function FolderActionsSheet({ folder, onClose, onDeleted }: FolderActions
               </div>
             </div>
           ) : (
-            <div className="flex flex-col gap-2 px-3 pb-2">
+            <ActionList className="pb-2">
               <ActionRow
                 icon={<Pencil size={18} strokeWidth={1.9} aria-hidden />}
                 label="Rename or change icon"
@@ -442,13 +443,13 @@ export function FolderActionsSheet({ folder, onClose, onDeleted }: FolderActions
                 tone="danger"
                 onClick={() => setMode('delete')}
               />
-              {!moveCheck.ok ? <p className="px-1 text-xs text-subtle">{moveCheck.reason}</p> : null}
+              {!moveCheck.ok ? <p className="text-label px-4 pb-3 text-subtle">{moveCheck.reason}</p> : null}
               {!keyringPresent ? (
-                <p className="px-1 text-xs leading-relaxed text-subtle">
+                <p className="text-label px-4 pb-3 leading-relaxed text-subtle">
                   Locking encrypts a folder and everything inside it. Set a passcode in Settings to turn it on.
                 </p>
               ) : null}
-            </div>
+            </ActionList>
           )}
         </SheetBody>
 
@@ -471,31 +472,6 @@ export function FolderActionsSheet({ folder, onClose, onDeleted }: FolderActions
   );
 }
 
-function ActionRow({
-  icon,
-  label,
-  onClick,
-  tone = 'default',
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  tone?: 'default' | 'danger';
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'tap flex w-full items-center gap-3 rounded-xl border border-border bg-surface-2 px-3.5 py-3 text-left active:bg-surface-3',
-        tone === 'danger' && 'text-danger',
-      )}
-    >
-      <span className={cn('shrink-0', tone === 'danger' ? 'text-danger' : 'text-muted')}>{icon}</span>
-      <span className="text-[0.9375rem] font-medium">{label}</span>
-    </button>
-  );
-}
 
 function ChoiceCard({
   title,
@@ -525,16 +501,16 @@ function ChoiceCard({
       )}
     >
       <span className="flex items-center gap-2">
-        <span className={cn('text-[0.9375rem] font-semibold', destructive ? 'text-danger' : 'text-accent')}>
+        <span className={cn('text-row font-semibold', destructive ? 'text-danger' : 'text-accent')}>
           {title}
         </span>
         {recommended ? (
-          <span className="rounded-md bg-accent px-1.5 py-0.5 text-[0.625rem] font-bold tracking-wide text-accent-fg uppercase">
+          <span className="text-label font-semibold text-accent">
             Safer
           </span>
         ) : null}
       </span>
-      <span className="text-[0.8125rem] leading-relaxed text-fg/80">{description}</span>
+      <span className="text-meta leading-relaxed text-fg/80">{description}</span>
     </button>
   );
 }

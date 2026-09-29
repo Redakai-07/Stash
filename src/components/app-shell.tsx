@@ -1,9 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { FilePlus2, Plus } from 'lucide-react';
 import { BottomNav } from './bottom-nav';
+import { AndroidBack } from './android-back';
 import { CaptureSheet } from './capture/capture-sheet';
 import { LockGate } from './privacy/lock-gate';
 import { Toaster, toast } from './ui/toast';
@@ -17,19 +18,65 @@ import { cn } from '@/lib/utils';
  * The page never scrolls as a whole; the main region does. That keeps the tab
  * bar pinned, makes the gesture bar behave, and means a sheet can take over the
  * screen without the underlying page shifting behind it.
- *
- * The floating action follows the context: on Notes it creates a note, anywhere
- * else it captures a link. One button, but always the action that screen is for.
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const captureStatus = useCaptureStore((state) => state.status);
+  const captureMode = useCaptureStore((state) => state.mode);
+
+  /*
+   * While an incoming share is being handled the chrome is not drawn at all.
+   * The capture surface covers the screen, so the tab bar and the action button
+   * would only ever be a flash of somebody else's screen behind the fade-in.
+   */
+  const shareTakeover = captureStatus !== 'idle' && captureMode === 'share';
+
+  return (
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-bg px-safe pt-safe">
+      <main id="main" className="scroll-area relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        {children}
+      </main>
+
+      {shareTakeover ? null : <React.Suspense fallback={null}>{<ContextAction />}</React.Suspense>}
+
+      {shareTakeover ? null : <BottomNav />}
+      <CaptureSheet />
+      <Toaster />
+      {/* Registered once, above every screen: the hardware back button. */}
+      <AndroidBack />
+      {/* Last so it paints over the shell, the sheets and the toasts alike. */}
+      <LockGate />
+    </div>
+  );
+}
+
+/**
+ * The floating action, wherever the user is.
+ *
+ * One button that is always the action the current screen is for: on Notes it
+ * creates a note, anywhere else it captures a link. Two cases make it step
+ * aside, and both are about the button being wrong rather than ugly:
+ *
+ *  - **A note is open in the editor.** The editor owns the bottom of the screen
+ *    with its formatting bar, which sits in exactly the space this button
+ *    occupies. A floating button on top of a toolbar is a button nobody can tap,
+ *    and creating a *new* note is not what anyone is doing mid-sentence.
+ *  - **A share is being handled**, because the capture surface is the whole
+ *    screen by then.
+ *
+ * This is a child of the shell, and wrapped in Suspense, for one reason:
+ * `useSearchParams` has to suspend during prerendering, and the shell is in the
+ * root layout where there is no boundary above it.
+ */
+function ContextAction() {
   const pathname = usePathname() ?? '/';
+  const params = useSearchParams();
   const router = useRouter();
   const openManual = useCaptureStore((state) => state.openManual);
+  const [busy, setBusy] = React.useState(false);
 
   const onNotes = pathname === '/notes' || pathname.startsWith('/notes/');
   const onSettings = pathname === '/settings' || pathname.startsWith('/settings/');
-  const showFab = !onSettings;
-  const [busy, setBusy] = React.useState(false);
+  const editingNote = onNotes && params.has('note');
 
   const handleAction = React.useCallback(async () => {
     if (!onNotes) {
@@ -46,37 +93,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.push(`/notes?note=${result.note.id}`);
   }, [onNotes, openManual, router]);
 
+  if (onSettings || editingNote) return null;
+
   return (
-    <div className="relative flex h-dvh flex-col overflow-hidden bg-bg pt-safe">
-      <main id="main" className="scroll-area relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        {children}
-      </main>
-
-      {showFab ? (
-        <button
-          type="button"
-          onClick={() => void handleAction()}
-          disabled={busy}
-          aria-label={onNotes ? 'New note' : 'Add a link'}
-          className={cn(
-            'tap tap-scale absolute right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30',
-            'flex size-13 items-center justify-center rounded-2xl bg-accent text-accent-fg shadow-raised',
-            'disabled:opacity-60',
-          )}
-        >
-          {onNotes ? (
-            <FilePlus2 size={23} strokeWidth={2.1} aria-hidden />
-          ) : (
-            <Plus size={24} strokeWidth={2.2} aria-hidden />
-          )}
-        </button>
-      ) : null}
-
-      <BottomNav />
-      <CaptureSheet />
-      <Toaster />
-      {/* Last so it paints over the shell, the sheets and the toasts alike. */}
-      <LockGate />
-    </div>
+    <button
+      type="button"
+      onClick={() => void handleAction()}
+      disabled={busy}
+      aria-label={onNotes ? 'New note' : 'Add a link'}
+      className={cn(
+        'tap tap-scale absolute right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30',
+        'flex size-13 items-center justify-center rounded-control bg-accent text-accent-fg shadow-raised',
+        'disabled:opacity-60',
+      )}
+    >
+      {onNotes ? <FilePlus2 size={23} strokeWidth={2.1} aria-hidden /> : <Plus size={24} strokeWidth={2.2} aria-hidden />}
+    </button>
   );
 }

@@ -45,19 +45,19 @@ export function DuplicateNotice({
           className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-warning/20 text-warning"
           aria-hidden
         >
-          <span className="text-[0.8125rem] font-bold">!</span>
+          <span className="text-meta font-bold">!</span>
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[0.9375rem] font-semibold text-fg">Already saved</p>
-          <p className="mt-0.5 text-sm leading-snug text-muted">
+          <p className="text-row font-semibold text-fg">Already saved</p>
+          <p className="mt-0.5 text-body leading-snug text-muted">
             in <span className="font-medium text-fg">{primary.folderPath}</span>
             <span className="text-subtle"> · {formatRelative(primary.link.createdAt)}</span>
           </p>
           {primary.link.title ? (
-            <p className="mt-1 line-clamp-2 text-[0.8125rem] text-muted">{primary.link.title}</p>
+            <p className="mt-1 line-clamp-2 text-meta text-muted">{primary.link.title}</p>
           ) : null}
           {extra > 0 ? (
-            <p className="mt-1 text-xs text-subtle">and {extra} more copies</p>
+            <p className="mt-1 text-meta text-subtle">and {extra} more copies</p>
           ) : null}
         </div>
       </div>
@@ -107,7 +107,7 @@ function NoticeAction({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'tap tap-scale flex h-10 items-center justify-center gap-1.5 rounded-lg px-2 text-[0.8125rem] font-medium',
+        'tap tap-scale flex h-10 items-center justify-center gap-1.5 rounded-lg px-2 text-meta font-medium',
         primary ? 'bg-accent text-accent-fg' : 'border border-border bg-surface text-fg active:bg-surface-3',
         'disabled:opacity-50',
       )}

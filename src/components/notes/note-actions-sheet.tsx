@@ -20,6 +20,7 @@ import { useBackDismiss } from '@/hooks/use-back-dismiss';
 import { useRouter } from 'next/navigation';
 import { useVaultStore, selectChildNotes, selectDescendantNoteCount } from '@/stores/vault-store';
 import { usePrivacyStore } from '@/stores/privacy-store';
+import { ActionList, ActionRow } from '@/components/ui/action-list';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
@@ -179,7 +180,7 @@ export function NoteActionsSheet({ note, onClose, onOpenNote, onDeleted }: NoteA
                       ? 'Delete note?'
                       : note.title}
               </SheetTitle>
-              <p className="mt-0.5 truncate text-xs text-subtle">
+              <p className="mt-0.5 truncate text-meta text-subtle">
                 {pluralize(childCount, 'subnote')}
                 {resourceCount > 0 ? ` · ${pluralize(resourceCount, 'link')}` : ''}
                 {note.isLocked ? ' · locked' : ''}
@@ -216,15 +217,15 @@ export function NoteActionsSheet({ note, onClose, onOpenNote, onDeleted }: NoteA
               filterPlaceholder="Find a parent note"
             />
           ) : mode === 'delete' ? (
-            <div className="flex flex-col gap-3 px-3 pb-2">
-              <div className="rounded-xl border border-border bg-surface-2 p-3.5">
-                <p className="text-[0.9375rem] font-semibold text-fg">“{note.title}” contains</p>
-                <ul className="mt-2 flex flex-col gap-1 text-[0.8125rem] text-muted">
+            <div className="flex flex-col gap-3 px-4 pb-2">
+              <div className="pt-3">
+                <p className="text-row font-semibold text-fg">“{note.title}” contains</p>
+                <ul className="text-meta mt-1.5 flex flex-col gap-1 text-muted">
                   <li>· {pluralize(childCount, 'direct subnote')}</li>
                   <li>· {pluralize(descendantCount, 'note')} in total below it</li>
                   <li>· {pluralize(impact?.referencedLinkCount ?? resourceCount, 'referenced link')}</li>
                 </ul>
-                <p className="mt-2.5 text-xs leading-relaxed text-subtle">
+                <p className="mt-2.5 text-meta leading-relaxed text-subtle">
                   Referenced links stay in your vault. Deleting a note only removes the note and the
                   references to it.
                 </p>
@@ -237,12 +238,12 @@ export function NoteActionsSheet({ note, onClose, onOpenNote, onDeleted }: NoteA
                 className="tap flex w-full flex-col gap-1 rounded-xl border border-accent/30 bg-accent-soft p-3.5 text-left active:bg-accent-soft/70 disabled:opacity-50"
               >
                 <span className="flex items-center gap-2">
-                  <span className="text-[0.9375rem] font-semibold text-accent">Delete only this note</span>
-                  <span className="rounded-md bg-accent px-1.5 py-0.5 text-[0.625rem] font-bold tracking-wide text-accent-fg uppercase">
+                  <span className="text-row font-semibold text-accent">Delete only this note</span>
+                  <span className="text-label font-semibold text-accent">
                     Keeps subnotes
                   </span>
                 </span>
-                <span className="text-[0.8125rem] leading-relaxed text-fg/80">
+                <span className="text-meta leading-relaxed text-fg/80">
                   {childCount > 0
                     ? `Its ${pluralize(childCount, 'subnote')} move up to where it sits now.`
                     : 'Nothing else is affected.'}
@@ -255,8 +256,8 @@ export function NoteActionsSheet({ note, onClose, onOpenNote, onDeleted }: NoteA
                 disabled={busy}
                 className="tap flex w-full flex-col gap-1 rounded-xl border border-danger/30 bg-danger-soft p-3.5 text-left active:bg-danger-soft/70 disabled:opacity-50"
               >
-                <span className="text-[0.9375rem] font-semibold text-danger">Delete this note and everything inside</span>
-                <span className="text-[0.8125rem] leading-relaxed text-fg/80">
+                <span className="text-row font-semibold text-danger">Delete this note and everything inside</span>
+                <span className="text-meta leading-relaxed text-fg/80">
                   {descendantCount > 0
                     ? `${pluralize(descendantCount, 'note')} go to the trash with it and come back together.`
                     : 'No subnotes to remove.'}
@@ -268,7 +269,7 @@ export function NoteActionsSheet({ note, onClose, onOpenNote, onDeleted }: NoteA
               </Button>
             </div>
           ) : (
-            <div className="flex flex-col gap-2 px-3 pb-2">
+            <ActionList className="pb-2">
               <ActionRow
                 icon={<FilePlus2 size={18} strokeWidth={1.9} aria-hidden />}
                 label="Add a subnote"
@@ -345,13 +346,13 @@ export function NoteActionsSheet({ note, onClose, onOpenNote, onDeleted }: NoteA
                 }}
               />
               {!keyringPresent ? (
-                <p className="px-2 pt-1 text-xs leading-relaxed text-subtle">
+                <p className="px-2 pt-1 text-meta leading-relaxed text-subtle">
                   Locking encrypts a note and its subnotes so they are unreadable while Stash is locked. Set a
                   passcode in Settings to turn it on.
                 </p>
               ) : null}
               {resourceCount > 0 ? (
-                <p className="flex items-center gap-1.5 px-2 pt-1 text-xs text-subtle">
+                <p className="flex items-center gap-1.5 px-2 pt-1 text-meta text-subtle">
                   <Link2 size={13} strokeWidth={2} aria-hidden />
                   {pluralize(resourceCount, 'linked resource')} stay in your vault.
                 </p>
@@ -362,7 +363,7 @@ export function NoteActionsSheet({ note, onClose, onOpenNote, onDeleted }: NoteA
                 tone="danger"
                 onClick={() => setMode('delete')}
               />
-            </div>
+            </ActionList>
           )}
         </SheetBody>
 
@@ -385,28 +386,3 @@ export function NoteActionsSheet({ note, onClose, onOpenNote, onDeleted }: NoteA
   );
 }
 
-function ActionRow({
-  icon,
-  label,
-  onClick,
-  tone = 'default',
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  tone?: 'default' | 'danger';
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'tap flex w-full items-center gap-3 rounded-xl border border-border bg-surface-2 px-3.5 py-3 text-left active:bg-surface-3',
-        tone === 'danger' && 'text-danger',
-      )}
-    >
-      <span className={cn('shrink-0', tone === 'danger' ? 'text-danger' : 'text-muted')}>{icon}</span>
-      <span className="text-[0.9375rem] font-medium">{label}</span>
-    </button>
-  );
-}

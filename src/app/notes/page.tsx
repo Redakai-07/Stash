@@ -173,7 +173,7 @@ function NotesView() {
               <ChevronLeft size={20} strokeWidth={2.2} aria-hidden />
             </button>
 
-            <nav aria-label="Breadcrumb" className="scroll-area flex min-w-0 flex-1 items-center gap-1 overflow-x-auto text-xs text-subtle no-scrollbar">
+            <nav aria-label="Breadcrumb" className="scroll-area flex min-w-0 flex-1 items-center gap-1 overflow-x-auto text-meta text-subtle no-scrollbar">
               <button
                 type="button"
                 onClick={() => router.push('/notes')}
@@ -209,7 +209,7 @@ function NotesView() {
             </button>
           </div>
 
-          <p className="mt-1 flex items-center gap-2 pl-8 text-xs text-subtle">
+          <p className="mt-1 flex items-center gap-2 pl-8 text-meta text-subtle">
             <span>{pluralize(descendantCount, 'note')} below</span>
             {current.isFavorite ? (
               <Star size={12} strokeWidth={2.4} className="fill-warning text-warning" aria-label="Favorite" />
@@ -245,7 +245,7 @@ function NotesView() {
               ))}
             </ListSurface>
           ) : (
-            <p className="px-4 pb-1 text-[0.8125rem] leading-relaxed text-subtle">
+            <p className="px-4 pb-1 text-meta leading-relaxed text-subtle">
               No subnotes yet. Splitting a large topic into subnotes keeps each one short and
               findable.
             </p>
@@ -260,7 +260,7 @@ function NotesView() {
               <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-accent">
                 <FilePlus2 size={17} strokeWidth={2.1} aria-hidden />
               </span>
-              <span className="text-[0.9375rem] font-medium text-accent">Add subnote</span>
+              <span className="text-row font-medium text-accent">Add subnote</span>
             </button>
           </div>
         </Section>

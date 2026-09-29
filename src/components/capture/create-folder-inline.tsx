@@ -82,12 +82,12 @@ export function CreateFolderInline({ folders, defaultParentId, onCancel, onCreat
           <button
             type="button"
             onClick={() => setChoosingParent(false)}
-            className="tap flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-accent active:bg-accent-soft"
+            className="tap flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-body font-medium text-accent active:bg-accent-soft"
           >
             <ArrowLeft size={16} strokeWidth={2.1} aria-hidden />
             Back
           </button>
-          <p className="text-sm text-muted">Choose a parent folder</p>
+          <p className="text-body text-muted">Choose a parent folder</p>
         </div>
         <FolderDestinationList
           folders={folders}
@@ -160,20 +160,20 @@ export function CreateFolderInline({ folders, defaultParentId, onCancel, onCreat
       >
         <CornerDownRight size={16} strokeWidth={1.9} className="shrink-0 text-subtle" aria-hidden />
         <span className="min-w-0 flex-1">
-          <span className="block text-xs text-subtle">Inside</span>
-          <span className="block truncate text-[0.9375rem] font-medium text-fg">{parentLabel}</span>
+          <span className="block text-meta text-subtle">Inside</span>
+          <span className="block truncate text-row font-medium text-fg">{parentLabel}</span>
         </span>
-        <span className="shrink-0 text-xs font-medium text-accent">Change</span>
+        <span className="shrink-0 text-meta font-medium text-accent">Change</span>
       </button>
 
       {error ? (
         <div className="flex items-start gap-2 rounded-xl bg-danger-soft px-3 py-2">
-          <p className="min-w-0 flex-1 text-[0.8125rem] leading-snug text-danger">{error}</p>
+          <p className="min-w-0 flex-1 text-meta leading-snug text-danger">{error}</p>
           {duplicateFolder ? (
             <button
               type="button"
               onClick={() => onCreated(duplicateFolder)}
-              className="tap shrink-0 rounded-lg px-2 py-1 text-[0.8125rem] font-semibold text-danger active:opacity-80"
+              className="tap shrink-0 rounded-lg px-2 py-1 text-meta font-semibold text-danger active:opacity-80"
             >
               Use it
             </button>
@@ -191,7 +191,7 @@ export function CreateFolderInline({ folders, defaultParentId, onCancel, onCreat
         </Button>
       </div>
 
-      <p className="flex items-center gap-1.5 pb-1 text-xs text-subtle">
+      <p className="flex items-center gap-1.5 pb-1 text-meta text-subtle">
         <FolderPlus size={13} strokeWidth={2} aria-hidden />
         The link saves into this folder right away.
       </p>

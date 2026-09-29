@@ -126,7 +126,7 @@ function SearchView() {
             autoCorrect="off"
             spellCheck={false}
             className={cn(
-              'h-12 w-full rounded-xl border border-border bg-surface-2 pr-10 pl-10 text-[1.0625rem] text-fg',
+              'h-12 w-full rounded-xl border border-border bg-surface-2 pr-10 pl-10 text-title text-fg',
               'placeholder:text-subtle focus:border-accent focus:bg-surface focus:outline-none',
             )}
           />
@@ -158,7 +158,7 @@ function SearchView() {
               }}
               aria-pressed={filter === option.id}
               className={cn(
-                'tap shrink-0 rounded-full px-3 py-1.5 text-[0.8125rem] font-medium transition-colors',
+                'tap shrink-0 rounded-full px-3 py-1.5 text-meta font-medium transition-colors',
                 filter === option.id
                   ? 'bg-accent text-accent-fg'
                   : 'border border-border bg-surface text-muted active:bg-surface-2',
@@ -181,8 +181,8 @@ function SearchView() {
                 className="tap flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 active:bg-surface-2"
               >
                 <TagIcon size={12} strokeWidth={2.2} className="text-subtle" aria-hidden />
-                <span className="text-[0.8125rem] font-medium text-fg">{tag.name}</span>
-                <span className="text-[0.6875rem] text-subtle">{tag.count}</span>
+                <span className="text-meta font-medium text-fg">{tag.name}</span>
+                <span className="text-label text-subtle">{tag.count}</span>
               </button>
             ))}
           </div>
@@ -257,10 +257,8 @@ function SearchView() {
 
       {outcome.links.length === 0 && outcome.folders.length === 0 && outcome.notes.length === 0 ? (
         <div className="flex flex-col items-center gap-2 px-8 py-14 text-center">
-          <span className="mb-1 flex size-12 items-center justify-center rounded-2xl bg-surface-2 text-subtle">
-            <SearchX size={22} strokeWidth={1.7} aria-hidden />
-          </span>
-          <p className="text-[0.9375rem] font-semibold text-fg">
+          <SearchX size={22} strokeWidth={1.7} className="mb-1 text-subtle" aria-hidden />
+          <p className="text-row font-semibold text-fg">
             {query.trim()
               ? 'Nothing matches that'
               : filter === 'archived'
@@ -271,7 +269,7 @@ function SearchView() {
                     ? 'Your vault is empty'
                     : 'Nothing here yet'}
           </p>
-          <p className="max-w-xs text-[0.8125rem] leading-relaxed text-muted">
+          <p className="max-w-xs text-meta leading-relaxed text-muted">
             {query.trim()
               ? 'Search covers link titles, addresses, your own notes and subnotes, tags and folder names. Everything is searched on this device.'
               : filter === 'archived'
@@ -284,14 +282,14 @@ function SearchView() {
       ) : null}
 
       {showRecent && filter === 'all' && (links.length > 0 || notes.length > 0) ? (
-        <p className="flex items-center justify-center gap-1.5 px-4 py-6 text-xs text-subtle">
+        <p className="flex items-center justify-center gap-1.5 px-4 py-6 text-meta text-subtle">
           <Clock size={13} strokeWidth={2} aria-hidden />
           Newest first · searched offline
         </p>
       ) : null}
 
       {filter === 'archived' && (outcome.links.length > 0 || outcome.notes.length > 0) ? (
-        <p className="px-5 py-6 text-center text-xs leading-relaxed text-subtle">
+        <p className="px-5 py-6 text-center text-meta leading-relaxed text-subtle">
           Archived items are hidden from Home, the Library and every other filter. Open one and choose
           &ldquo;Restore from archive&rdquo; to bring it back.
         </p>

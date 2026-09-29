@@ -165,13 +165,13 @@ export function NoteEditor({ note, save, readOnly = false, onUnlock }: NoteEdito
         readOnly={readOnly}
         enterKeyHint="done"
         className={cn(
-          'w-full bg-transparent px-4 pt-1 text-[1.5rem] leading-tight font-semibold tracking-tight text-fg',
+          'w-full bg-transparent px-4 pt-1 text-display leading-tight font-semibold tracking-tight text-fg',
           'placeholder:text-subtle focus:outline-none',
         )}
       />
 
       <div className="flex items-center justify-between gap-2 px-4 pt-1 pb-2">
-        <p className="min-w-0 truncate text-xs text-subtle">
+        <p className="min-w-0 truncate text-meta text-subtle">
           {readOnly
             ? 'Locked · encrypted, reading only'
             : mode === 'preview'
@@ -179,7 +179,7 @@ export function NoteEditor({ note, save, readOnly = false, onUnlock }: NoteEdito
               : 'Markdown · tap a formatting button to insert'}
         </p>
         <span
-          className="flex shrink-0 items-center gap-1.5 text-xs"
+          className="flex shrink-0 items-center gap-1.5 text-meta"
           aria-live="polite"
           aria-atomic="true"
         >
@@ -212,7 +212,7 @@ export function NoteEditor({ note, save, readOnly = false, onUnlock }: NoteEdito
           spellCheck
           autoCapitalize="sentences"
           className={cn(
-            'w-full resize-none bg-transparent px-4 pb-6 text-[1rem] leading-relaxed text-fg',
+            'w-full resize-none bg-transparent px-4 pb-6 text-title leading-relaxed text-fg',
             'placeholder:text-subtle focus:outline-none',
           )}
         />
@@ -230,7 +230,7 @@ export function NoteEditor({ note, save, readOnly = false, onUnlock }: NoteEdito
       <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-surface/95 backdrop-blur-xl">
         {readOnly ? (
           <div className="flex items-center gap-3 px-3 py-2">
-            <span className="flex flex-1 items-center gap-2 text-[0.8125rem] text-muted">
+            <span className="flex flex-1 items-center gap-2 text-meta text-muted">
               <Lock size={15} strokeWidth={2} aria-hidden />
               {onUnlock
                 ? 'Encrypted. Unlock to edit again.'
@@ -240,7 +240,7 @@ export function NoteEditor({ note, save, readOnly = false, onUnlock }: NoteEdito
               <button
                 type="button"
                 onClick={onUnlock}
-                className="tap flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-accent px-3 text-[0.8125rem] font-semibold text-accent-fg"
+                className="tap flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-accent px-3 text-meta font-semibold text-accent-fg"
               >
                 <Unlock size={15} strokeWidth={2.2} aria-hidden />
                 Unlock
@@ -264,12 +264,12 @@ export function NoteEditor({ note, save, readOnly = false, onUnlock }: NoteEdito
               aria-label="Link address"
               inputMode="url"
               autoComplete="off"
-              className="h-10 min-w-0 flex-1 rounded-xl border border-border bg-surface-2 px-3 text-[0.9375rem] text-fg placeholder:text-subtle focus:border-accent focus:outline-none"
+              className="h-10 min-w-0 flex-1 rounded-xl border border-border bg-surface-2 px-3 text-row text-fg placeholder:text-subtle focus:border-accent focus:outline-none"
             />
             <button
               type="button"
               onClick={commitLink}
-              className="tap flex h-10 items-center rounded-xl bg-accent px-3.5 text-[0.875rem] font-semibold text-accent-fg"
+              className="tap flex h-10 items-center rounded-xl bg-accent px-3.5 text-body font-semibold text-accent-fg"
             >
               Insert
             </button>
@@ -348,7 +348,7 @@ export function NoteEditor({ note, save, readOnly = false, onUnlock }: NoteEdito
                 setMode((current) => (current === 'edit' ? 'preview' : 'edit'));
               }}
               className={cn(
-                'tap tap-scale flex h-9 shrink-0 items-center gap-1.5 rounded-xl px-3 text-[0.8125rem] font-medium',
+                'tap tap-scale flex h-9 shrink-0 items-center gap-1.5 rounded-xl px-3 text-meta font-medium',
                 mode === 'preview' ? 'bg-accent text-accent-fg' : 'text-muted active:bg-surface-2',
               )}
             >

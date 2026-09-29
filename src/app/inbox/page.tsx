@@ -135,7 +135,7 @@ export default function InboxPage() {
               />
             ))}
           </ListSurface>
-          <p className="flex items-start gap-2 px-5 pt-3 text-xs leading-relaxed text-subtle">
+          <p className="flex items-start gap-2 px-5 pt-3 text-meta leading-relaxed text-subtle">
             <InboxIcon size={14} strokeWidth={2} className="mt-0.5 shrink-0" aria-hidden />
             Tap ⋯ on a row to file one link, or use File all to move the whole Inbox somewhere at once.
           </p>
@@ -182,14 +182,14 @@ function FileAllSheet({
       <SheetContent>
         <SheetHeader>
           <SheetTitle>File the whole Inbox</SheetTitle>
-          <p className="mt-0.5 text-xs text-subtle">
+          <p className="mt-0.5 text-meta text-subtle">
             Every link without a folder moves to one place. Nothing is deleted, so this can be undone by moving
             things again.
           </p>
         </SheetHeader>
         <SheetBody>
           {busy ? (
-            <p className="flex items-center gap-2 px-3 pb-3 text-[0.875rem] text-muted">
+            <p className="flex items-center gap-2 px-3 pb-3 text-body text-muted">
               <Loader2 size={16} strokeWidth={2.4} className="animate-spin" aria-hidden />
               Filing…
             </p>

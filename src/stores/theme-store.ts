@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { getThemeMode, setThemeMode, type ThemeMode } from '@/db/repos/settings';
+import { syncSystemBars } from '@/lib/system-bars';
 
 export type { ThemeMode };
 
@@ -35,6 +36,8 @@ function applyResolved(resolved: ResolvedTheme): void {
   const root = document.documentElement;
   root.classList.toggle('dark', resolved === 'dark');
   root.style.colorScheme = resolved;
+  // Android draws the bars itself, so the theme has to be handed over too.
+  syncSystemBars(resolved);
 }
 
 /**

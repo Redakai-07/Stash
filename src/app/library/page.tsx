@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState, ListSurface, PageHeader, Section } from '@/components/ui/page';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
-import { Icon, isIconName } from '@/components/ui/icon';
+
 import { LinkRow } from '@/components/links/link-row';
 import { LinkActionsSheet } from '@/components/links/link-actions-sheet';
 import { FolderRow } from '@/components/folders/folder-row';
@@ -99,7 +99,7 @@ function LibraryView() {
       <PageHeader>
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-subtle">
+            <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-meta text-subtle">
               <Link href="/library" className="tap rounded px-1 py-0.5 active:bg-surface-2">
                 Library
               </Link>
@@ -115,20 +115,21 @@ function LibraryView() {
                 </React.Fragment>
               ))}
             </nav>
+            {/*
+              No icon beside the title. The folder's icon already appears on its
+              own row in the parent list, and repeating it here — inside a tinted
+              rounded square — was the most template-looking element on the
+              screen while telling the user nothing the heading did not.
+            */}
             <div className="mt-1 flex items-center gap-2">
-              {currentFolder && isIconName(currentFolder.icon) ? (
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
-                  <Icon name={currentFolder.icon} size={15} strokeWidth={1.95} />
-                </span>
-              ) : null}
-              <h1 className="truncate text-[1.375rem] leading-tight font-semibold tracking-tight text-fg">
+              <h1 className="text-display truncate font-semibold text-fg">
                 {currentFolder?.name ?? 'All folders'}
               </h1>
               {currentFolder?.isFavorite ? (
                 <Star size={15} strokeWidth={2.2} className="shrink-0 fill-warning text-warning" aria-hidden />
               ) : null}
             </div>
-            <p className="mt-0.5 truncate text-[0.8125rem] text-muted">
+            <p className="mt-0.5 truncate text-meta text-muted">
               {currentId
                 ? `${pluralize(directLinks.length, 'link')} here${nestedCount > 0 ? ` · ${nestedCount} below` : ''}${subfolders.length > 0 ? ` · ${pluralize(subfolders.length, 'subfolder')}` : ''}`
                 : `${pluralize(folders.length, 'folder')} · ${pluralize(totalLinks, 'link')}`}
@@ -142,7 +143,7 @@ function LibraryView() {
                   type="button"
                   onClick={() => setActiveFolder(currentFolder)}
                   aria-label="Folder options"
-                  className="tap flex size-10 items-center justify-center rounded-xl text-muted active:bg-surface-2"
+                  className="tap flex size-10 items-center justify-center rounded-full text-subtle active:bg-surface-2"
                 >
                   <Layers size={18} strokeWidth={1.9} aria-hidden />
                 </button>
@@ -152,7 +153,7 @@ function LibraryView() {
                     router.push(currentFolder.parentId ? `/library?folder=${currentFolder.parentId}` : '/library')
                   }
                   aria-label="Go up one level"
-                  className="tap flex size-10 items-center justify-center rounded-xl text-muted active:bg-surface-2"
+                  className="tap flex size-10 items-center justify-center rounded-full text-subtle active:bg-surface-2"
                 >
                   <ChevronLeft size={19} strokeWidth={2} aria-hidden />
                 </button>
@@ -206,13 +207,13 @@ function LibraryView() {
                   setCreateError(null);
                 }}
               >
-                <span className="text-lg leading-none">×</span>
+                <span className="text-display leading-none">×</span>
               </Button>
             </div>
             {createError ? (
-              <p className="px-1 text-[0.8125rem] text-danger">{createError}</p>
+              <p className="px-1 text-meta text-danger">{createError}</p>
             ) : (
-              <p className="px-1 text-xs text-subtle">
+              <p className="px-1 text-meta text-subtle">
                 Saves into {currentId ? folderPathLabel(folders, currentId) : 'the top level'}.
               </p>
             )}

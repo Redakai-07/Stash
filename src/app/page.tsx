@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FolderPlus, Inbox as InboxIcon, Share2, Sparkles, Star, Tag as TagIcon } from 'lucide-react';
+import { FolderPlus, Inbox as InboxIcon, Share2 } from 'lucide-react';
 import type { Folder, Note, SavedLink } from '@/db/types';
 import { childrenOf } from '@/lib/tree';
 import { pluralize } from '@/lib/format';
@@ -87,16 +87,22 @@ export default function HomePage() {
       {!isEmpty && inbox.length > 0 ? (
         <Section title="Inbox" action="Organize" actionHref="/inbox" className="mt-3">
           <div className="px-4">
+            {/*
+              The one deliberate emphasis on Home: the Inbox is the only thing
+              here that is asking the user to do something. It is a filled row
+              rather than a bordered card, so it reads as a prompt instead of
+              another object in the list.
+            */}
             <Link
               href="/inbox"
-              className="tap flex items-center gap-3 rounded-xl border border-accent/30 bg-accent-soft px-3.5 py-3 active:opacity-90"
+              className="tap flex items-center gap-3 rounded-control bg-accent-soft px-4 py-3 active:opacity-90"
             >
-              <InboxIcon size={19} strokeWidth={1.9} className="shrink-0 text-accent" aria-hidden />
+              <InboxIcon size={18} strokeWidth={1.9} className="shrink-0 text-accent" aria-hidden />
               <span className="min-w-0 flex-1">
-                <span className="block text-[0.9375rem] font-semibold text-accent">
+                <span className="block text-row font-semibold text-accent">
                   {pluralize(inbox.length, 'link')} waiting to be organized
                 </span>
-                <span className="mt-0.5 block truncate text-xs text-accent/80">
+                <span className="mt-0.5 block truncate text-meta text-accent/80">
                   {inbox
                     .slice(0, 2)
                     .map((link) => link.title?.trim() || link.source || link.url)
@@ -112,16 +118,15 @@ export default function HomePage() {
       {isEmpty ? (
         <div className="px-4 pt-6">
           <EmptyState
-            icon={<Sparkles size={22} strokeWidth={1.7} />}
             title="Save something worth coming back to."
             description="Share a link to Stash from any app, or add one by hand with the + button. Nothing has to be filed, named or sorted — it goes to the Inbox and waits. Everything stays on this device."
           />
-          <div className="mx-auto mt-2 max-w-sm rounded-2xl border border-border bg-surface p-4">
-            <p className="flex items-center gap-2 text-[0.9375rem] font-semibold text-fg">
-              <Share2 size={17} strokeWidth={1.9} className="text-accent" aria-hidden />
+          <div className="mt-8 border-t border-hairline pt-4">
+            <p className="flex items-center gap-2 text-row font-semibold text-fg">
+              <Share2 size={16} strokeWidth={1.9} className="text-accent" aria-hidden />
               Save from another app
             </p>
-            <ol className="mt-2.5 flex flex-col gap-2 text-[0.8125rem] leading-relaxed text-muted">
+            <ol className="text-meta mt-2.5 flex flex-col gap-1.5 leading-relaxed text-muted">
               <li>
                 <span className="font-medium text-fg">1.</span> Find a video, post or article you want to keep.
               </li>
@@ -152,21 +157,26 @@ export default function HomePage() {
                 ))}
               </ListSurface>
             ) : (
-              <p className="px-4 py-3 text-[0.8125rem] text-muted">Nothing saved yet.</p>
+              <p className="px-4 py-3 text-meta text-muted">Nothing saved yet.</p>
             )}
           </Section>
 
           {favoriteFolders.length > 0 ? (
             <Section title="Favorite folders">
-              <div className="-mx-0 flex gap-2 overflow-x-auto px-4 pb-1 no-scrollbar">
+              {/*
+                Plain names, not star-pill chips. The section is already called
+                "Favorite folders", so a star on every item only repeats the
+                heading, and a row of bordered pills is the most template-looking
+                element the app could have.
+              */}
+              <div className="flex flex-wrap gap-x-5 gap-y-2 px-4">
                 {favoriteFolders.map((folder) => (
                   <Link
                     key={folder.id}
                     href={`/library?folder=${folder.id}`}
-                    className="tap flex shrink-0 items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 active:bg-surface-2"
+                    className="tap text-body font-medium text-fg active:text-accent"
                   >
-                    <Star size={14} strokeWidth={2.2} className="fill-warning text-warning" aria-hidden />
-                    <span className="text-[0.875rem] font-medium text-fg">{folder.name}</span>
+                    {folder.name}
                   </Link>
                 ))}
               </div>
@@ -200,16 +210,18 @@ export default function HomePage() {
 
           {tags.length > 0 ? (
             <Section title="Tags" action="Search" actionHref="/search">
-              <div className="-mx-0 flex gap-1.5 overflow-x-auto px-4 pb-1 no-scrollbar">
+              <div className="scroll-area flex flex-wrap gap-x-5 gap-y-2 overflow-x-auto px-4">
                 {tags.slice(0, 12).map((tag) => (
                   <Link
                     key={tag.name}
                     href={`/search?q=${encodeURIComponent(tag.name)}`}
-                    className="tap flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 active:bg-surface-2"
+                    className="tap flex shrink-0 items-baseline gap-1.5 active:text-accent"
                   >
-                    <TagIcon size={12} strokeWidth={2.2} className="text-subtle" aria-hidden />
-                    <span className="text-[0.8125rem] font-medium text-fg">{tag.name}</span>
-                    <span className="text-[0.6875rem] text-subtle">{tag.count}</span>
+                    <span className="text-body font-medium text-fg">
+                      <span className="text-subtle">#</span>
+                      {tag.name}
+                    </span>
+                    <span className="text-label text-subtle">{tag.count}</span>
                   </Link>
                 ))}
               </div>
@@ -251,7 +263,7 @@ export default function HomePage() {
             <div className="flex flex-col gap-2 px-4 pt-2">
               <Link
                 href="/inbox"
-                className="tap flex items-center gap-2 rounded-xl border border-dashed border-border-strong px-3 py-2.5 text-[0.875rem] font-medium text-accent active:bg-surface-2"
+                className="tap flex items-center gap-2 rounded-xl border border-dashed border-border-strong px-3 py-2.5 text-body font-medium text-accent active:bg-surface-2"
               >
                 <InboxIcon size={16} strokeWidth={1.9} aria-hidden />
                 {inbox.length > 0
@@ -260,7 +272,7 @@ export default function HomePage() {
               </Link>
               <Link
                 href="/library"
-                className="tap flex items-center gap-2 rounded-xl border border-dashed border-border-strong px-3 py-2.5 text-[0.875rem] font-medium text-accent active:bg-surface-2"
+                className="tap flex items-center gap-2 rounded-xl border border-dashed border-border-strong px-3 py-2.5 text-body font-medium text-accent active:bg-surface-2"
               >
                 <FolderPlus size={16} strokeWidth={1.9} aria-hidden />
                 Open the full folder tree

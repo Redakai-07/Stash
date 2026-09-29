@@ -49,7 +49,7 @@ function ReadingView() {
       </SheetHeader>
       <div className="flex flex-col items-center gap-3 px-6 pb-14">
         <Loader2 size={26} strokeWidth={2} className="animate-spin text-accent" aria-hidden />
-        <p className="text-sm text-muted">Reading and validating the file…</p>
+        <p className="text-body text-muted">Reading and validating the file…</p>
       </div>
     </>
   );
@@ -63,7 +63,7 @@ function ApplyingView() {
       </SheetHeader>
       <div className="flex flex-col items-center gap-3 px-6 pb-14">
         <Loader2 size={26} strokeWidth={2} className="animate-spin text-accent" aria-hidden />
-        <p className="max-w-xs text-center text-xs leading-relaxed text-subtle">
+        <p className="max-w-xs text-center text-meta leading-relaxed text-subtle">
           This is one database transaction. If anything fails it rolls back whole, and your current data is left
           exactly as it was.
         </p>
@@ -87,7 +87,7 @@ function PassphraseView() {
     <>
       <SheetHeader>
         <SheetTitle>This backup is encrypted</SheetTitle>
-        <p className="mt-1 text-sm text-muted">
+        <p className="mt-1 text-body text-muted">
           {pending.fileName} is protected by a passphrase, which is separate from your Stash passcode.
         </p>
       </SheetHeader>
@@ -106,7 +106,7 @@ function PassphraseView() {
             placeholder="Backup passphrase"
             aria-label="Backup passphrase"
           />
-          {pendingMessage ? <p className="text-xs leading-relaxed text-danger">{pendingMessage}</p> : null}
+          {pendingMessage ? <p className="text-meta leading-relaxed text-danger">{pendingMessage}</p> : null}
           <Notice tone="neutral">
             Nothing has been written yet. The file is only read once the passphrase opens it.
           </Notice>
@@ -155,7 +155,7 @@ function ReviewView() {
     <>
       <SheetHeader>
         <SheetTitle>Restore from backup</SheetTitle>
-        <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+        <p className="mt-1 flex items-center gap-1.5 text-meta text-muted">
           <FileJson size={13} strokeWidth={2} aria-hidden />
           {draft.fileName} · {formatBytes(draft.bytes)}
           {report.exportedAt ? ` · ${formatDate(report.exportedAt)}` : ''}
@@ -187,19 +187,19 @@ function ReviewView() {
           ))}
 
           {report.repairs.length > 0 ? (
-            <div className="rounded-xl border border-border bg-surface-2 p-3">
-              <p className="flex items-center gap-1.5 text-xs font-semibold text-fg">
+            <div className="rounded-xl border border-hairline bg-surface-2 p-3">
+              <p className="flex items-center gap-1.5 text-meta font-semibold text-fg">
                 <Info size={13} strokeWidth={2.2} aria-hidden />
                 Adjustments that will be made
               </p>
               <ul className="mt-1.5 flex flex-col gap-1">
                 {report.repairs.map((repair) => (
-                  <li key={repair} className="text-xs leading-relaxed text-muted">
+                  <li key={repair} className="text-meta leading-relaxed text-muted">
                     {repair}
                   </li>
                 ))}
               </ul>
-              <p className="mt-1.5 text-xs leading-relaxed text-subtle">
+              <p className="mt-1.5 text-meta leading-relaxed text-subtle">
                 Nothing is deleted by these adjustments — a row that pointed outside the backup is made reachable.
               </p>
             </div>
@@ -213,7 +213,7 @@ function ReviewView() {
           ) : null}
 
           {/* Mode -------------------------------------------------------- */}
-          <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+          <div className="overflow-hidden rounded-control border border-hairline bg-surface">
             <ModeRow
               active={mode === 'merge'}
               onClick={() => void setMode('merge')}
@@ -230,23 +230,23 @@ function ReviewView() {
           </div>
 
           {plan ? (
-            <div className="rounded-xl border border-border bg-surface-2 p-3">
-              <p className="text-xs font-semibold text-fg">
+            <div className="rounded-xl border border-hairline bg-surface-2 p-3">
+              <p className="text-meta font-semibold text-fg">
                 {replace ? 'This will replace your vault with' : 'This will add'}{' '}
                 {planTotal(plan) === 0 ? 'nothing' : `${planTotal(plan)} item(s)`}
               </p>
-              <ul className="mt-1.5 flex flex-col gap-0.5 text-xs text-muted">
+              <ul className="mt-1.5 flex flex-col gap-0.5 text-meta text-muted">
                 <li>{plan.counts.folders} folder(s), {plan.counts.links} link(s), {plan.counts.notes} note(s)</li>
                 <li>{plan.counts.tags} tag(s), {plan.counts.linkTags + plan.counts.noteLinks} reference(s)</li>
               </ul>
               {plan.skipped.folders + plan.skipped.links + plan.skipped.notes + plan.skipped.tags > 0 ? (
-                <p className="mt-1.5 text-xs leading-relaxed text-subtle">
+                <p className="mt-1.5 text-meta leading-relaxed text-subtle">
                   {plan.skipped.folders + plan.skipped.links + plan.skipped.notes + plan.skipped.tags} item(s)
                   already exist here and are skipped rather than overwritten.
                 </p>
               ) : null}
               {plan.messages.map((planMessage) => (
-                <p key={planMessage} className="mt-1.5 text-xs leading-relaxed text-subtle">
+                <p key={planMessage} className="mt-1.5 text-meta leading-relaxed text-subtle">
                   {planMessage}
                 </p>
               ))}
@@ -274,7 +274,7 @@ function ReviewView() {
           {replace ? (
             <div className="rounded-xl border border-danger/30 bg-danger-soft p-3">
               <div className="flex items-center justify-between gap-3">
-                <span className="text-[0.8125rem] font-medium text-fg">
+                <span className="text-meta font-medium text-fg">
                   Replace everything on this device
                 </span>
                 <Switch
@@ -283,7 +283,7 @@ function ReviewView() {
                   aria-label="Confirm replace"
                 />
               </div>
-              <p className="mt-1.5 text-xs leading-relaxed text-fg/80">
+              <p className="mt-1.5 text-meta leading-relaxed text-fg/80">
                 A safety copy of your current data is written before anything is cleared, so this is reversible.
               </p>
             </div>
@@ -332,25 +332,25 @@ function DoneView({ onClose }: { onClose: () => void }) {
             <>
               <Notice tone="danger">{message ?? 'The backup was refused.'}</Notice>
               {details.length > 0 ? (
-                <div className="rounded-xl border border-border bg-surface-2 p-3">
-                  <p className="text-xs font-semibold text-fg">What is wrong with it</p>
+                <div className="rounded-xl border border-hairline bg-surface-2 p-3">
+                  <p className="text-meta font-semibold text-fg">What is wrong with it</p>
                   <ul className="mt-1.5 flex flex-col gap-1">
                     {details.map((detail) => (
-                      <li key={detail} className="text-xs leading-relaxed text-muted">
+                      <li key={detail} className="text-meta leading-relaxed text-muted">
                         {detail}
                       </li>
                     ))}
                   </ul>
                 </div>
               ) : null}
-              <p className="px-1 text-xs leading-relaxed text-subtle">
+              <p className="px-1 text-meta leading-relaxed text-subtle">
                 Your vault was not touched. Validation happens before anything is written, so a file that fails
                 these checks leaves the database exactly as it was.
               </p>
             </>
           ) : (
             <>
-              <p className="flex items-center gap-2 text-sm text-fg">
+              <p className="flex items-center gap-2 text-body text-fg">
                 <CheckCircle2 size={18} strokeWidth={2} className="text-success" aria-hidden />
                 {result.mode === 'replace' ? 'Replaced from the backup.' : 'Added from the backup.'}
               </p>
@@ -373,7 +373,7 @@ function DoneView({ onClose }: { onClose: () => void }) {
               {result.emergencyPath ? (
                 <Notice tone="neutral">
                   Your previous data was copied first. If this was a mistake, that copy is at{' '}
-                  <span className="font-mono text-[0.6875rem] break-all">{result.emergencyPath}</span> and can be
+                  <span className="font-mono text-label break-all">{result.emergencyPath}</span> and can be
                   restored the same way you restored this one.
                 </Notice>
               ) : result.mode === 'replace' ? (
@@ -434,8 +434,8 @@ function ModeRow({
         {active ? <span className="h-2.5 w-2.5 rounded-full bg-accent" /> : null}
       </span>
       <span className="min-w-0">
-        <span className={cn('block text-[0.9375rem] font-medium', active ? 'text-accent' : 'text-fg')}>{title}</span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-muted">{description}</span>
+        <span className={cn('block text-row font-medium', active ? 'text-accent' : 'text-fg')}>{title}</span>
+        <span className="mt-0.5 block text-meta leading-relaxed text-muted">{description}</span>
       </span>
     </button>
   );
@@ -443,9 +443,9 @@ function ModeRow({
 
 function CountCell({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl border border-border bg-surface-2 px-3 py-2">
-      <p className="text-base font-semibold text-fg">{value}</p>
-      <p className="text-[0.6875rem] tracking-wide text-subtle uppercase">{label}</p>
+    <div className="rounded-xl border border-hairline bg-surface-2 px-3 py-2">
+      <p className="text-title font-semibold text-fg">{value}</p>
+      <p className="text-label text-subtle">{label}</p>
     </div>
   );
 }
@@ -460,7 +460,7 @@ function Notice({
   return (
     <div
       className={cn(
-        'rounded-xl border p-3 text-xs leading-relaxed',
+        'rounded-xl border p-3 text-meta leading-relaxed',
         tone === 'neutral' && 'border-border bg-surface-2 text-muted',
         tone === 'warn' && 'border-warning/40 bg-surface-2 text-fg/85',
         tone === 'danger' && 'border-danger/30 bg-danger-soft text-fg/85',

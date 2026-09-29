@@ -66,7 +66,7 @@ export function BottomNav() {
                 </span>
                 <span
                   className={cn(
-                    'text-[0.625rem] leading-none font-medium tracking-tight transition-colors duration-200',
+                    'text-label leading-none font-medium tracking-tight transition-colors duration-200',
                     active ? 'text-accent' : 'text-subtle',
                   )}
                 >

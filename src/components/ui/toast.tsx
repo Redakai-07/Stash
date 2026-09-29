@@ -107,9 +107,9 @@ function ToastRow({ record }: { record: ToastRecord }) {
         )}
       />
       <div className="min-w-0 flex-1">
-        <p className="text-[0.9375rem] leading-snug text-fg">{record.message}</p>
+        <p className="text-row leading-snug text-fg">{record.message}</p>
         {record.description ? (
-          <p className="mt-0.5 text-xs leading-snug text-muted">{record.description}</p>
+          <p className="mt-0.5 text-meta leading-snug text-muted">{record.description}</p>
         ) : null}
       </div>
       {record.action ? (
@@ -119,7 +119,7 @@ function ToastRow({ record }: { record: ToastRecord }) {
             record.action?.onSelect();
             dismiss(record.id);
           }}
-          className="tap shrink-0 rounded-lg px-2 py-1 text-[0.9375rem] font-semibold text-accent active:bg-accent-soft"
+          className="tap shrink-0 rounded-lg px-2 py-1 text-row font-semibold text-accent active:bg-accent-soft"
         >
           {record.action.label}
         </button>

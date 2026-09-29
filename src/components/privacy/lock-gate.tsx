@@ -56,13 +56,11 @@ export function LockGate() {
       aria-label="Stash is locked"
       className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-5 overflow-y-auto bg-bg px-6 py-10 pt-safe pb-safe"
     >
-      <div className="flex size-16 items-center justify-center rounded-3xl bg-accent-soft">
-        <Lock size={28} strokeWidth={1.9} className="text-accent" aria-hidden />
-      </div>
+      <Lock size={30} strokeWidth={1.7} className="text-accent" aria-hidden />
 
       <div className="text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-fg">Stash is locked</h1>
-        <p className="mt-1.5 max-w-xs text-[0.8125rem] leading-relaxed text-muted">
+        <h1 className="text-display font-semibold tracking-tight text-fg">Stash is locked</h1>
+        <p className="mt-1.5 max-w-xs text-meta leading-relaxed text-muted">
           Locked notes, links and folders stay encrypted until you unlock. Everything else is on this device as
           usual.
         </p>
@@ -125,7 +123,7 @@ export function LockGate() {
         type="button"
         onClick={() => setSkipped(true)}
         className={cn(
-          'tap mt-2 max-w-xs rounded-xl px-3 py-2 text-center text-[0.8125rem] leading-relaxed text-subtle',
+          'tap mt-2 max-w-xs rounded-xl px-3 py-2 text-center text-meta leading-relaxed text-subtle',
           'active:bg-surface-2',
         )}
       >

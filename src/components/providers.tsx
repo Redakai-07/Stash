@@ -163,8 +163,11 @@ export function ShareListener() {
 export function BootSplash() {
   return (
     <div className="flex h-dvh flex-col items-center justify-center gap-4 bg-bg">
-      <div className="animate-pop-in flex size-14 items-center justify-center rounded-2xl bg-accent-soft">
-        <svg viewBox="0 0 24 24" className="size-7 text-accent" aria-hidden>
+      {/* The mark alone, with no tinted tile behind it: on a screen that shows
+          nothing else, a coloured rounded square would be the loudest object in
+          the app and would say nothing. */}
+      <div className="animate-pop-in">
+        <svg viewBox="0 0 24 24" className="size-9 text-accent" aria-hidden>
           <path
             d="M6 3h7l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"
             fill="none"
@@ -175,7 +178,7 @@ export function BootSplash() {
           <path d="M13 3v5h5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
         </svg>
       </div>
-      <p className="text-sm text-subtle">Opening your vault…</p>
+      <p className="text-body text-subtle">Opening your vault…</p>
     </div>
   );
 }
@@ -192,9 +195,9 @@ export function BootGate({ children }: { children: React.ReactNode }) {
   if (status === 'error') {
     return (
       <div className="flex h-dvh flex-col items-center justify-center gap-3 bg-bg px-8 text-center">
-        <p className="text-base font-semibold text-fg">Could not open the local vault</p>
-        <p className="text-sm text-muted">{error}</p>
-        <p className="text-xs text-subtle">
+        <p className="text-title font-semibold text-fg">Could not open the local vault</p>
+        <p className="text-body text-muted">{error}</p>
+        <p className="text-meta text-subtle">
           Stash stores everything on this device. Check that storage is not full and try again.
         </p>
       </div>

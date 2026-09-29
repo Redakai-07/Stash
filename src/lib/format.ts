@@ -53,20 +53,18 @@ export function displayUrl(url: string, maxLength = 64): string {
   return value;
 }
 
-/** First letter of a folder name, used by the icon-less folder tile. */
+/** First letter of a folder name. */
 export function folderInitial(name: string): string {
   const match = name.trim().match(/[\p{L}\p{N}]/u);
   return match ? match[0].toUpperCase() : '#';
 }
 
-/** Deterministic soft tint for folder tiles, derived from the id. */
-const TILE_TINTS = ['accent', 'emerald', 'amber', 'sky', 'rose', 'violet'] as const;
-export type TileTint = (typeof TILE_TINTS)[number];
-
-export function tintForId(id: string): TileTint {
-  let hash = 0;
-  for (let i = 0; i < id.length; i += 1) {
-    hash = (hash * 31 + id.charCodeAt(i)) % 100000;
-  }
-  return TILE_TINTS[hash % TILE_TINTS.length] ?? 'accent';
-}
+/*
+ * `tintForId` used to live here: a hash that picked one of six soft tints for a
+ * row's letter tile. It was removed with the tiles themselves. Colour in this
+ * app means one of three things — the accent is the action or the selection,
+ * amber is a favourite, red is a problem — and a hue derived from an id meant
+ * none of them. Six colours that distinguish nothing are decoration, and
+ * decoration that varies per row is the loudest tell that a list was generated
+ * rather than designed.
+ */

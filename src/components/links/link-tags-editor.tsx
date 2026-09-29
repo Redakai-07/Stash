@@ -54,7 +54,7 @@ export function LinkTagsEditor({ linkId }: { linkId: string }) {
 
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface-2 px-3.5 py-3">
-      <p className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-wider text-subtle uppercase">
+      <p className="flex items-center gap-1.5 text-label font-medium text-subtle">
         <TagIcon size={12} strokeWidth={2.2} aria-hidden />
         Tags
       </p>
@@ -64,7 +64,7 @@ export function LinkTagsEditor({ linkId }: { linkId: string }) {
           {draft.map((name) => (
             <span
               key={name}
-              className="inline-flex items-center gap-1 rounded-full bg-accent-soft py-0.5 pr-1 pl-2 text-[0.8125rem] font-medium text-accent"
+              className="inline-flex items-center gap-1 rounded-full bg-accent-soft py-0.5 pr-1 pl-2 text-meta font-medium text-accent"
             >
               {name}
               <button
@@ -79,7 +79,7 @@ export function LinkTagsEditor({ linkId }: { linkId: string }) {
           ))}
         </div>
       ) : (
-        <p className="text-[0.8125rem] text-muted">No tags yet.</p>
+        <p className="text-meta text-muted">No tags yet.</p>
       )}
 
       <div className="flex items-center gap-2">
@@ -118,12 +118,12 @@ export function LinkTagsEditor({ linkId }: { linkId: string }) {
               type="button"
               onClick={() => add(tag.name)}
               className={cn(
-                'tap rounded-full border border-border bg-surface px-2.5 py-1 text-[0.8125rem] text-muted',
+                'tap rounded-full border border-border bg-surface px-2.5 py-1 text-meta text-muted',
                 'active:bg-surface-3',
               )}
             >
               {tag.name}
-              <span className="ml-1 text-[0.6875rem] text-subtle">{tag.count}</span>
+              <span className="ml-1 text-label text-subtle">{tag.count}</span>
             </button>
           ))}
         </div>
@@ -152,7 +152,7 @@ export function LinkTagChips({ names, className }: { names: readonly string[]; c
       {names.map((name) => (
         <span
           key={name}
-          className="rounded-md bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] font-medium text-muted"
+          className="rounded-md bg-surface-2 px-1.5 py-0.5 text-label font-medium text-muted"
         >
           {name}
         </span>

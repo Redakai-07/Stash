@@ -28,6 +28,7 @@ import { LinkTagsEditor } from './link-tags-editor';
 import { useBackDismiss } from '@/hooks/use-back-dismiss';
 import { useVaultStore } from '@/stores/vault-store';
 import { usePrivacyStore } from '@/stores/privacy-store';
+import { ActionList, ActionRow } from '@/components/ui/action-list';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
@@ -211,7 +212,7 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
                         ? 'Tags'
                         : link.title?.trim() || displayUrl(link.url, 40)}
               </SheetTitle>
-              <p className="mt-0.5 truncate text-xs text-subtle">
+              <p className="mt-0.5 truncate text-meta text-subtle">
                 {mode === 'move' ? currentFolder : `${link.source ?? ''} · ${formatShortDate(link.createdAt)}`}
               </p>
             </div>
@@ -243,8 +244,8 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
           ) : mode === 'confirm-delete' ? (
             <div className="px-3 pb-2">
               <div className="rounded-xl border border-danger/30 bg-danger-soft p-3.5">
-                <p className="text-[0.9375rem] font-semibold text-danger">This removes the link permanently</p>
-                <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-fg/80">
+                <p className="text-row font-semibold text-danger">This removes the link permanently</p>
+                <p className="mt-1.5 text-meta leading-relaxed text-fg/80">
                   “{link.title?.trim() || displayUrl(link.url, 40)}” moves to the trash. Its note and the notes
                   that reference it are left alone, and you can restore it from Settings → Trash.
                 </p>
@@ -260,28 +261,23 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
               </div>
             </div>
           ) : (
-            <div className="flex flex-col gap-2 px-3 pb-2">
-              <div className="rounded-xl border border-border bg-surface-2 px-3.5 py-3">
-                <p className="text-[0.6875rem] font-semibold tracking-wider text-subtle uppercase">Address</p>
-                <p className="mt-1 break-all text-[0.8125rem] leading-relaxed text-muted">{link.url}</p>
-                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                  <span className="inline-flex items-center gap-1 rounded-md bg-surface px-1.5 py-0.5 text-[0.6875rem] font-medium text-muted">
-                    <FolderInput size={11} strokeWidth={2} aria-hidden />
-                    {currentFolder}
-                  </span>
-                  {link.sourcePackage ? (
-                    <span className="rounded-md bg-surface px-1.5 py-0.5 text-[0.6875rem] text-subtle">
-                      via {link.sourcePackage.split('.').pop()}
-                    </span>
-                  ) : null}
-                </div>
+            <ActionList className="pb-2">
+              {/*
+                Address, folder and note read as plain sections of one list
+                rather than as cards stacked inside a sheet. Nothing here is
+                raised off the page, so nothing here gets a box.
+              */}
+              <div className="px-4 py-3">
+                <p className="text-label text-subtle">Address</p>
+                <p className="text-meta mt-1 break-all leading-relaxed text-muted">{link.url}</p>
+                <p className="text-label mt-1.5 text-subtle">
+                  In {currentFolder}
+                  {link.sourcePackage ? ` · via ${link.sourcePackage.split('.').pop()}` : ''}
+                </p>
               </div>
 
-              <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface-2 px-3.5 py-3">
-                <label
-                  htmlFor="link-note"
-                  className="text-[0.6875rem] font-semibold tracking-wider text-subtle uppercase"
-                >
+              <div className="flex flex-col gap-2 px-4 py-3">
+                <label htmlFor="link-note" className="text-label text-subtle">
                   Your note
                 </label>
                 <Textarea
@@ -291,7 +287,7 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
                   rows={3}
                   maxLength={2000}
                   placeholder="Why did you keep this?"
-                  className="bg-surface text-[0.9375rem]"
+                  className="bg-surface text-row"
                 />
                 {noteDirty ? (
                   <Button variant="accentSoft" size="sm" onClick={() => void saveNote()} disabled={busy}>
@@ -302,9 +298,9 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
               </div>
 
               {referencingNotes.length > 0 ? (
-                <div className="rounded-xl border border-border bg-surface-2 px-3.5 py-3">
-                  <p className="text-[0.6875rem] font-semibold tracking-wider text-subtle uppercase">Referenced in</p>
-                  <div className="mt-2 flex flex-col gap-1">
+                <div className="px-4 py-3">
+                  <p className="text-label text-subtle">Referenced in</p>
+                  <div className="mt-1.5 flex flex-col gap-0.5">
                     {referencingNotes.map((ref) => (
                       <button
                         key={ref.id}
@@ -313,10 +309,10 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
                           close();
                           router.push(`/notes?note=${ref.id}`);
                         }}
-                        className="tap flex items-center gap-2 rounded-lg px-1.5 py-1.5 text-left active:bg-surface-2"
+                        className="tap flex items-center gap-2 rounded-tap py-1.5 text-left active:bg-surface-2"
                       >
                         <NotebookPen size={14} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden />
-                        <span className="truncate text-[0.875rem] text-fg">{ref.title}</span>
+                        <span className="truncate text-body text-fg">{ref.title}</span>
                       </button>
                     ))}
                   </div>
@@ -442,7 +438,7 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
                 tone="danger"
                 onClick={() => setMode('confirm-delete')}
               />
-            </div>
+            </ActionList>
           )}
         </SheetBody>
 
@@ -472,28 +468,3 @@ export function LinkActionsSheet({ link, onClose }: LinkActionsSheetProps) {
   );
 }
 
-function ActionRow({
-  icon,
-  label,
-  onClick,
-  tone = 'default',
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  tone?: 'default' | 'danger';
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'tap flex w-full items-center gap-3 rounded-xl border border-border bg-surface-2 px-3.5 py-3 text-left active:bg-surface-3',
-        tone === 'danger' && 'text-danger',
-      )}
-    >
-      <span className={cn('shrink-0', tone === 'danger' ? 'text-danger' : 'text-muted')}>{icon}</span>
-      <span className="text-[0.9375rem] font-medium">{label}</span>
-    </button>
-  );
-}

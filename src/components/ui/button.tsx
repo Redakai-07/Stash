@@ -23,9 +23,9 @@ const buttonVariants = cva(
         accentSoft: 'bg-accent-soft text-accent active:opacity-85',
       },
       size: {
-        sm: 'h-9 min-h-9 px-3 text-sm',
-        md: 'h-11 min-h-11 px-4 text-[0.9375rem]',
-        lg: 'h-12 min-h-12 px-5 text-base',
+        sm: 'h-9 min-h-9 px-3 text-body',
+        md: 'h-11 min-h-11 px-4 text-row',
+        lg: 'h-12 min-h-12 px-5 text-title',
         icon: 'h-11 w-11 min-h-11',
         'icon-sm': 'h-9 w-9 min-h-9',
       },

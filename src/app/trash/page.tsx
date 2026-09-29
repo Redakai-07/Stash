@@ -111,7 +111,7 @@ export default function TrashPage() {
       </PageHeader>
 
       {!loaded ? (
-        <p className="flex items-center gap-2 px-5 py-6 text-[0.875rem] text-muted">
+        <p className="flex items-center gap-2 px-5 py-6 text-body text-muted">
           <Loader2 size={16} strokeWidth={2.4} className="animate-spin" aria-hidden />
           Reading the trash…
         </p>
@@ -141,7 +141,7 @@ export default function TrashPage() {
                 />
               ))}
             </ListSurface>
-            <p className="px-5 pt-3 text-xs leading-relaxed text-subtle">
+            <p className="px-5 pt-3 text-meta leading-relaxed text-subtle">
               Restoring puts everything back where it was, with the same names, the same order and the same
               addresses. If a parent folder is gone for good, the item comes back at the top level rather than
               pointing at a place that no longer exists.
@@ -149,9 +149,9 @@ export default function TrashPage() {
           </Section>
 
           <Section title="Delete for good" className="pb-10">
-            <div className="mx-4 rounded-2xl border border-danger/30 bg-danger-soft p-4">
-              <p className="text-[0.9375rem] font-semibold text-danger">Empty the trash</p>
-              <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-fg/80">
+            <div className="mx-4 rounded-control border border-danger/30 bg-danger-soft p-4">
+              <p className="text-row font-semibold text-danger">Empty the trash</p>
+              <p className="mt-1.5 text-meta leading-relaxed text-fg/80">
                 Permanently removes {pluralize(total, 'item')} from this device. There is no undo after this — the
                 only action in Stash that cannot be taken back. Export a backup first if you are unsure.
               </p>
@@ -208,14 +208,14 @@ function TrashRow({
           <Trash2 size={16} strokeWidth={1.9} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[0.9375rem] leading-tight font-medium text-fg">
+          <p className="truncate text-row leading-tight font-medium text-fg">
             {entry.label.trim() || 'Locked item'}
           </p>
-          <p className="mt-0.5 truncate text-xs text-subtle">
+          <p className="mt-0.5 truncate text-meta text-subtle">
             {entry.kind === 'folder' ? 'Folder' : entry.kind === 'note' ? 'Note' : 'Link'}
             {description ? ` · ${description}` : ''}
           </p>
-          <p className="mt-0.5 truncate text-xs text-subtle">
+          <p className="mt-0.5 truncate text-meta text-subtle">
             {entry.path} · deleted {formatShortDate(entry.deletedAt)}
           </p>
         </div>
@@ -223,7 +223,7 @@ function TrashRow({
 
       {confirming ? (
         <div className="mt-2 flex items-center gap-2">
-          <span className="flex items-center gap-1.5 text-xs text-danger">
+          <span className="flex items-center gap-1.5 text-meta text-danger">
             <ShieldAlert size={13} strokeWidth={2.2} aria-hidden />
             Gone for good?
           </span>

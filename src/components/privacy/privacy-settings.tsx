@@ -125,10 +125,10 @@ export function PrivacySettings() {
   return (
     <>
       <Section title="Locking">
-        <div className="mx-4 overflow-hidden rounded-2xl border border-border bg-surface">
+        <div className="mx-4 overflow-hidden rounded-control border border-hairline bg-surface">
           <div className="flex items-center justify-between gap-3 px-4 py-3.5">
             <div className="min-w-0">
-              <p className="flex items-center gap-2 text-[0.9375rem] font-medium text-fg">
+              <p className="flex items-center gap-2 text-row font-medium text-fg">
                 {keyringPresent ? (
                   <LockKeyhole size={17} strokeWidth={1.9} className="shrink-0 text-accent" aria-hidden />
                 ) : (
@@ -136,7 +136,7 @@ export function PrivacySettings() {
                 )}
                 {keyringPresent ? (unlocked ? 'Unlocked' : 'Locked') : 'Not set up'}
               </p>
-              <p className="mt-0.5 text-xs leading-relaxed text-subtle">
+              <p className="mt-0.5 text-meta leading-relaxed text-subtle">
                 {keyringPresent
                   ? hasLocks
                     ? `${pluralize(lockedCounts.notes, 'note')}, ${pluralize(lockedCounts.links, 'link')} and ${pluralize(lockedCounts.folders, 'folder')} protected`
@@ -269,7 +269,7 @@ export function PrivacySettings() {
           {mode === 'disable' ? (
             <div className="border-t border-border px-3 py-3">
               <div className="flex flex-col gap-3">
-                <p className="rounded-xl border border-warning/30 bg-surface-2 px-3 py-2.5 text-[0.8125rem] leading-relaxed text-fg/85">
+                <p className="rounded-xl border border-warning/30 bg-surface-2 px-3 py-2.5 text-meta leading-relaxed text-fg/85">
                   Turning locking off decrypts every locked item and stores it in the clear again. The passcode is
                   removed.
                 </p>
@@ -303,7 +303,7 @@ export function PrivacySettings() {
       {keyringPresent ? (
         <>
           <Section title="Re-lock">
-            <div className="mx-4 overflow-hidden rounded-2xl border border-border bg-surface">
+            <div className="mx-4 overflow-hidden rounded-control border border-hairline bg-surface">
               {RELOCK_POLICIES.map((option, index) => (
                 <button
                   key={option.id}
@@ -319,30 +319,30 @@ export function PrivacySettings() {
                   <span className="min-w-0">
                     <span
                       className={cn(
-                        'block text-[0.9375rem] font-medium',
+                        'block text-row font-medium',
                         settings.relockPolicy === option.id ? 'text-accent' : 'text-fg',
                       )}
                     >
                       {option.label}
                     </span>
-                    <span className="mt-0.5 block text-xs text-subtle">{option.description}</span>
+                    <span className="mt-0.5 block text-meta text-subtle">{option.description}</span>
                   </span>
                   {settings.relockPolicy === option.id ? (
-                    <span className="shrink-0 text-[0.6875rem] font-bold tracking-wide text-accent uppercase">
+                    <span className="shrink-0 text-label font-semibold text-accent">
                       Active
                     </span>
                   ) : null}
                 </button>
               ))}
             </div>
-            <p className="px-5 pt-2 text-xs leading-relaxed text-subtle">
+            <p className="px-5 pt-2 text-meta leading-relaxed text-subtle">
               Locking drops the vault key from memory. Locked items stay encrypted on disk either way — this only
               controls how soon you must unlock again.
             </p>
           </Section>
 
           <Section title="Protection">
-            <div className="mx-4 overflow-hidden rounded-2xl border border-border bg-surface">
+            <div className="mx-4 overflow-hidden rounded-control border border-hairline bg-surface">
               <ToggleRow
                 icon={<Lock size={17} strokeWidth={1.9} aria-hidden />}
                 label="Cover the app when locked"
@@ -362,7 +362,7 @@ export function PrivacySettings() {
           </Section>
 
           <Section title="Device unlock">
-            <div className="mx-4 overflow-hidden rounded-2xl border border-border bg-surface">
+            <div className="mx-4 overflow-hidden rounded-control border border-hairline bg-surface">
               <ToggleRow
                 icon={<Fingerprint size={17} strokeWidth={1.9} aria-hidden />}
                 label="Use fingerprint or face"
@@ -388,15 +388,15 @@ export function PrivacySettings() {
               />
             </div>
             {!deviceUnlockReady && settings.biometric && deviceAuthAvailable ? (
-              <p className="px-5 pt-2 text-xs leading-relaxed text-subtle">
+              <p className="px-5 pt-2 text-meta leading-relaxed text-subtle">
                 Unlock once with your passcode to arm the biometric fast path on this device.
               </p>
             ) : null}
           </Section>
 
           <Section title="What is protected">
-            <div className="mx-4 rounded-2xl border border-border bg-surface p-4">
-              <ul className="flex flex-col gap-2 text-[0.8125rem] leading-relaxed text-muted">
+            <div className="mx-4 rounded-control border border-hairline bg-surface p-4">
+              <ul className="flex flex-col gap-2 text-meta leading-relaxed text-muted">
                 <li>
                   <span className="font-medium text-fg">Encrypted:</span> a locked item&apos;s note title and body,
                   a locked link&apos;s address and title, and a locked folder&apos;s name. Locking a folder covers
@@ -421,18 +421,18 @@ export function PrivacySettings() {
           </Section>
 
           <Section title="If you forget the passcode" className="pb-10">
-            <div className="mx-4 rounded-2xl border border-danger/30 bg-danger-soft p-4">
-              <p className="flex items-center gap-2 text-[0.9375rem] font-semibold text-danger">
+            <div className="mx-4 rounded-control border border-danger/30 bg-danger-soft p-4">
+              <p className="flex items-center gap-2 text-row font-semibold text-danger">
                 <AlertTriangle size={17} strokeWidth={2} aria-hidden />
                 There is no recovery
               </p>
-              <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-fg/85">
+              <p className="mt-1.5 text-meta leading-relaxed text-fg/85">
                 Your passcode is the only thing that opens locked items. Nothing else is deleted if you never
                 unlock again — the rest of your vault keeps working normally.
               </p>
               {mode === 'abandon' ? (
                 <div className="mt-3 flex flex-col gap-2">
-                  <p className="text-[0.8125rem] leading-relaxed text-danger">
+                  <p className="text-meta leading-relaxed text-danger">
                     Removing the lock destroys the key. Every locked note, link and folder becomes permanently
                     unreadable and cannot be recovered on any device.
                   </p>
@@ -485,8 +485,8 @@ function ToggleRow({
     <div className={cn('flex items-start gap-3 px-4 py-3.5', !last && 'border-b border-border')}>
       <span className="mt-0.5 shrink-0 text-muted">{icon}</span>
       <div className="min-w-0 flex-1">
-        <p className="text-[0.9375rem] font-medium text-fg">{label}</p>
-        <p className="mt-0.5 text-xs leading-relaxed text-subtle">{description}</p>
+        <p className="text-row font-medium text-fg">{label}</p>
+        <p className="mt-0.5 text-meta leading-relaxed text-subtle">{description}</p>
       </div>
       <Switch
         checked={checked}

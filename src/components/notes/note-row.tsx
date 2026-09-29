@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronRight, FileText, Link2, Lock, MoreHorizontal, Star } from 'lucide-react';
+import { ChevronRight, Link2, Lock, MoreHorizontal, Star } from 'lucide-react';
 import type { Note } from '@/db/types';
 import { checklistProgress } from '@/lib/markdown';
 import { formatRelative, pluralize } from '@/lib/format';
@@ -13,10 +13,14 @@ import { cn } from '@/lib/utils';
 /**
  * A note in a list.
  *
- * Shows what distinguishes one note from another -- how many subnotes it holds,
+ * Shows what distinguishes one note from another — how many subnotes it holds,
  * whether it has a checklist and how far through it is, how many links are
- * attached -- without turning into a card. A note that is a container reads as a
+ * attached — without becoming a card. A note that is a container reads as a
  * container; a note with content shows its opening line.
+ *
+ * There is no leading tile. The title and the metadata are the row; a rounded
+ * square with an initial in it is the single most recognisable generated-UI
+ * flourish and it told the user nothing they were not already reading.
  */
 export interface NoteRowProps {
   note: Note;
@@ -57,7 +61,7 @@ export function NoteRow({
   meta.push(formatRelative(note.updatedAt));
 
   return (
-    <div className={cn('flex items-stretch gap-1 rounded-xl', highlight && 'ring-1 ring-accent/30 ring-inset', className)}>
+    <div className={cn('flex items-stretch', highlight && 'bg-accent-soft/40', className)}>
       <button
         type="button"
         onClick={() => {
@@ -65,50 +69,35 @@ export function NoteRow({
           onOpen();
         }}
         {...handlers}
-        className="tap flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-left active:bg-surface-2"
+        className="tap flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left active:bg-surface-2"
       >
-        <span
-          className={cn(
-            'flex size-9 shrink-0 items-center justify-center rounded-xl',
-            childCount > 0 ? 'bg-surface-2 text-muted' : 'bg-surface-2 text-subtle',
-          )}
-        >
-          {childCount > 0 ? (
-            <span className="text-[0.8125rem] font-bold">{note.title.slice(0, 1).toUpperCase()}</span>
-          ) : (
-            <FileText size={16} strokeWidth={1.9} aria-hidden />
-          )}
-        </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
-            <span className="min-w-0 truncate text-[0.9375rem] leading-tight font-medium text-fg">
-              {note.title}
-            </span>
-            {locked ? (
-              <Lock size={12} strokeWidth={2.4} className="shrink-0 text-accent" aria-label="Locked note" />
-            ) : null}
+            <span className="text-row min-w-0 truncate font-medium text-fg">{note.title}</span>
+            {locked ? <Lock size={12} strokeWidth={2.4} className="shrink-0 text-accent" aria-label="Locked note" /> : null}
             {note.isFavorite ? (
               <Star size={12} strokeWidth={2.4} className="shrink-0 fill-warning text-warning" aria-label="Favorite" />
             ) : null}
           </span>
-          <span className="mt-0.5 block truncate text-xs text-subtle">
-            {subtitle ?? meta.join(' · ')}
-          </span>
+          <span className="text-meta mt-0.5 block truncate text-subtle">{subtitle ?? meta.join(' · ')}</span>
           {!subtitle && preview.length > 0 && childCount === 0 ? (
-            <span className="mt-0.5 block truncate text-xs text-subtle/80">{preview}</span>
+            <span className="text-meta mt-0.5 line-clamp-2 block text-muted">{preview}</span>
           ) : null}
         </span>
         {childCount > 0 ? (
-          <span className="flex shrink-0 items-center gap-1 text-xs text-subtle">
+          <span className="text-meta flex shrink-0 items-center gap-1 text-subtle">
             {childCount}
             <ChevronRight size={15} strokeWidth={2} aria-hidden />
           </span>
         ) : null}
       </button>
 
-      <div className="flex shrink-0 items-center">
+      <div className="flex shrink-0 items-center pr-1">
         {linkCount > 0 ? (
-          <span className="flex items-center gap-1 pr-1 text-xs text-subtle" aria-label={pluralize(linkCount, 'linked resource')}>
+          <span
+            className="text-meta flex items-center gap-1 pr-1 text-subtle"
+            aria-label={pluralize(linkCount, 'linked resource')}
+          >
             <Link2 size={13} strokeWidth={2} aria-hidden />
             {linkCount}
           </span>
@@ -119,7 +108,7 @@ export function NoteRow({
             onClick={onToggleFavorite}
             aria-label={note.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
             aria-pressed={note.isFavorite}
-            className="tap flex size-9 items-center justify-center rounded-full active:bg-surface-2"
+            className="tap flex size-10 items-center justify-center rounded-full active:bg-surface-2"
           >
             <Star
               size={17}
@@ -133,7 +122,7 @@ export function NoteRow({
           type="button"
           onClick={onShowActions}
           aria-label={`${note.title} actions`}
-          className="tap mr-0.5 flex size-9 items-center justify-center rounded-full text-subtle active:bg-surface-2"
+          className="tap flex size-10 items-center justify-center rounded-full text-subtle active:bg-surface-2"
         >
           <MoreHorizontal size={18} strokeWidth={2} aria-hidden />
         </button>
