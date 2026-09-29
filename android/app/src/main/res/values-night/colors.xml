@@ -1,6 +1,6 @@
 <resources>
 
-    <!-- Dark-mode window colour: the app's own dark `--bg`, not black. -->
+    <!-- Dark-mode window colour: the app's own dark background, not black. -->
     <color name="stash_window_background">#131317</color>
 
 </resources>
