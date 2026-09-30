@@ -20,7 +20,7 @@ import {
 import { getSecureStore } from '@/lib/privacy/secure-store';
 import { unsealEverything } from '@/lib/privacy/reconcile';
 import { applyScreenPrivacy } from '@/lib/privacy/screen';
-import { shouldLockOnBackground, shouldRelock } from '@/lib/privacy/session';
+import { shouldLockOnTabChange, shouldRelock } from '@/lib/privacy/session';
 
 /**
  * The privacy session.
@@ -32,9 +32,17 @@ import { shouldLockOnBackground, shouldRelock } from '@/lib/privacy/session';
  * cannot reach it. `unlocked` here is a mirror for rendering, and the authority
  * is always `isSessionLocked()`.
  *
- * A locked session means: locked items are missing from every listing, and the
- * lock gate covers the app if the user asked for that. Locking is cheap and
- * idempotent, and it can never destroy data — the keyring is untouched.
+ * A locked session does **not** mean the app is behind a lock screen. Stash has
+ * no password of its own and never asks for one to open: the app opens, and every
+ * locked folder, note and link is simply not readable — it is ciphertext with its
+ * fields blanked, shown as a locked row. Tapping one of those rows is the only
+ * thing that raises the system prompt, and passing it unlocks the whole vault for
+ * the session, so the other locked folders open too.
+ *
+ * The session is deliberately short-lived: it ends on the next tab change and the
+ * moment the app stops being visible (see `handleBackground` / `lockOnTabChange`).
+ * Locking is cheap and idempotent, and it can never destroy data — the keyring is
+ * untouched.
  */
 
 export interface ActionResult {
@@ -70,6 +78,13 @@ export interface PrivacyState {
   deviceUnlockReady: boolean;
   /** When the app went to the background, for the re-lock policy. */
   backgroundedAt: number | null;
+  /**
+   * When the session was last unlocked, or `null` while it is locked.
+   *
+   * Read for exactly one decision — whether a navigation belongs to the unlock
+   * that just happened or is the user moving on (see `lockOnTabChange`).
+   */
+  unlockedAt: number | null;
   /** Explanation of the last failed unlock, shown on the gate. */
   message: string | null;
   /**
@@ -118,6 +133,14 @@ export interface PrivacyState {
   requestReveal: (kind: RevealKind, id: string) => Promise<ActionResult>;
   clearReveal: () => void;
   lock: () => void;
+  /**
+   * End the unlocked session when the user moves to another tab.
+   *
+   * Called by the shell on every top-level navigation. Opening the thing a reveal
+   * just unlocked is not leaving — the grace in `session.ts` covers that one
+   * navigation — but going to a different tab always ends the session.
+   */
+  lockOnTabChange: (now?: number) => void;
   handleBackground: (now?: number) => void;
   /** Returns true when the policy expired the session on the way back in. */
   handleForeground: (now?: number) => boolean;
@@ -168,6 +191,7 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
   deviceAuthAvailable: false,
   deviceUnlockReady: false,
   backgroundedAt: null,
+  unlockedAt: null,
   message: null,
   revealRequest: null,
   busy: false,
@@ -208,6 +232,9 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
       deviceAuthAvailable,
       deviceUnlockReady,
       unlocked,
+      // Nothing was unlocked by a person here: a vault with no keyring starts
+      // open because there is nothing to protect, not because it was opened.
+      unlockedAt: null,
     });
     syncScreenPrivacy(settings.secureScreen, unlocked);
   },
@@ -234,6 +261,7 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
       deviceUnlockReady,
       unlocked: !keyring,
       backgroundedAt: null,
+      unlockedAt: null,
       message: null,
     });
     syncScreenPrivacy(settings.secureScreen, !keyring);
@@ -284,6 +312,7 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
       deviceUnlockReady: true,
       deviceAuthAvailable: true,
       unlocked: true,
+      unlockedAt: Date.now(),
       message: null,
     });
     syncScreenPrivacy(settings.secureScreen, true);
@@ -340,6 +369,7 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
       keyringPresent: false,
       passcodeSet: false,
       unlocked: true,
+      unlockedAt: null,
       deviceUnlockReady: false,
       message: null,
     });
@@ -366,7 +396,14 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
     const settings = get().settings;
     // The passcode path clears a queued reveal too, so the gate steps aside the
     // moment the item behind it becomes readable.
-    set({ busy: false, unlocked: true, backgroundedAt: null, message: null, revealRequest: null });
+    set({
+      busy: false,
+      unlocked: true,
+      unlockedAt: Date.now(),
+      backgroundedAt: null,
+      message: null,
+      revealRequest: null,
+    });
     syncScreenPrivacy(settings.secureScreen, true);
     return { ok: true };
   },
@@ -422,7 +459,14 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
     const settings = get().settings;
     // A queued reveal is satisfied by the unlock it was waiting for: whatever
     // asked for it re-renders with real data one refresh later.
-    set({ busy: false, unlocked: true, backgroundedAt: null, message: null, revealRequest: null });
+    set({
+      busy: false,
+      unlocked: true,
+      unlockedAt: Date.now(),
+      backgroundedAt: null,
+      message: null,
+      revealRequest: null,
+    });
     syncScreenPrivacy(settings.secureScreen, true);
     return { ok: true };
   },
@@ -435,17 +479,38 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
     // a boolean, the material to decrypt simply stops existing in this process.
     forgetVaultKey();
     const settings = get().settings;
-    set({ unlocked: false, backgroundedAt: null, message: null });
+    set({ unlocked: false, unlockedAt: null, backgroundedAt: null, message: null });
     syncScreenPrivacy(settings.secureScreen, false);
   },
 
+  lockOnTabChange: (now = Date.now()) => {
+    const state = get();
+    // Nothing to end when there is no keyring (nothing is protected) or when the
+    // session is already locked. The reveal grace is what keeps an unlock and the
+    // navigation it caused from cancelling each other out.
+    if (!state.keyringPresent || !state.unlocked) return;
+    if (!shouldLockOnTabChange(state.unlockedAt, now)) return;
+    get().lock();
+  },
+
+  /**
+   * Leaving the foreground ends the session, always.
+   *
+   * This is what "the user locked the phone or the computer" looks like from
+   * inside the app, and it is the whole point of unlocking per session: the same
+   * person picking the phone back up has to pass the prompt again.
+   *
+   * The lock happens here rather than on resume because Android may kill the
+   * process while it is backgrounded — a promise kept only on resume is one the
+   * app was never alive to keep.
+   *
+   * `relockPolicy` is deliberately ignored: it exists so a vault written by an
+   * earlier build still loads, not to make this decision any more.
+   */
   handleBackground: (now = Date.now()) => {
     if (!get().unlocked) return;
     set({ backgroundedAt: now });
-    // With `immediate`, lock now rather than on resume: Android may kill the
-    // process while it is backgrounded, and a promise kept only on resume would
-    // not survive that.
-    if (shouldLockOnBackground(get().settings.relockPolicy)) get().lock();
+    get().lock();
   },
 
   handleForeground: (now = Date.now()) => {
@@ -471,6 +536,7 @@ export const usePrivacyStore = create<PrivacyState>((set, get) => ({
       keyringPresent: false,
       passcodeSet: false,
       unlocked: true,
+      unlockedAt: null,
       deviceUnlockReady: false,
       message: null,
     });

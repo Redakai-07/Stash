@@ -9,8 +9,20 @@ import { CaptureSheet } from './capture/capture-sheet';
 import { LockGate } from './privacy/lock-gate';
 import { Toaster, toast } from './ui/toast';
 import { useCaptureStore } from '@/stores/capture-store';
+import { usePrivacyStore } from '@/stores/privacy-store';
 import { useVaultStore } from '@/stores/vault-store';
 import { cn } from '@/lib/utils';
+
+/**
+ * The top-level section a route belongs to.
+ *
+ * `/` is Home; anything else is its first segment. Used to tell "the user moved
+ * to another tab" from "the user went deeper into this one", which is the whole
+ * difference between ending an unlocked session and getting in the way.
+ */
+function sectionOf(pathname: string): string {
+  return pathname.split('/')[1] ?? '';
+}
 
 /**
  * The one-handed shell.
@@ -22,6 +34,24 @@ import { cn } from '@/lib/utils';
 export function AppShell({ children }: { children: React.ReactNode }) {
   const captureStatus = useCaptureStore((state) => state.status);
   const captureMode = useCaptureStore((state) => state.mode);
+  const pathname = usePathname() ?? '/';
+  const lockOnTabChange = usePrivacyStore((state) => state.lockOnTabChange);
+
+  /*
+   * An unlock lasts for the session, and the session is the tab.
+   *
+   * Opening a folder or a note does not leave the section, so walking around
+   * inside one does not re-lock anything. Moving to a different top-level screen
+   * does — and the one navigation that is exempt is the one a reveal caused, which
+   * `lockOnTabChange` recognises by having just happened (see `session.ts`).
+   */
+  const section = sectionOf(pathname);
+  const previousSection = React.useRef(section);
+  React.useEffect(() => {
+    if (previousSection.current === section) return;
+    previousSection.current = section;
+    lockOnTabChange();
+  }, [section, lockOnTabChange]);
 
   /*
    * While an incoming share is being handled the chrome is not drawn at all.
@@ -102,12 +132,14 @@ function ContextAction() {
       disabled={busy}
       aria-label={onNotes ? 'New note' : 'Add a link'}
       className={cn(
-        'tap tap-scale absolute right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30',
-        'flex size-13 items-center justify-center rounded-control bg-accent text-accent-fg shadow-raised',
+        // `bottom-20 mb-safe` sits it one clear step above the tab bar, and adds
+        // the system inset through the same variable the bar itself uses.
+        'tap tap-scale absolute right-4 bottom-20 z-30 mb-safe',
+        'flex size-14 items-center justify-center rounded-full bg-accent text-accent-fg shadow-raised',
         'disabled:opacity-60',
       )}
     >
-      {onNotes ? <FilePlus2 size={23} strokeWidth={2.1} aria-hidden /> : <Plus size={24} strokeWidth={2.2} aria-hidden />}
+      {onNotes ? <FilePlus2 size={25} strokeWidth={2.1} aria-hidden /> : <Plus size={26} strokeWidth={2.2} aria-hidden />}
     </button>
   );
 }

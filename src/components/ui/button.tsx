@@ -6,8 +6,12 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 /**
- * Buttons are tuned for thumbs: a 44px minimum hit target, obvious pressed
- * state, and no reliance on hover, which does not exist on a phone.
+ * Buttons are tuned for thumbs: a 44px minimum hit target, a soft pressed state,
+ * and no reliance on hover, which does not exist on a phone.
+ *
+ * The primary button is the accent and 48px tall wherever there is room for it,
+ * because the action a screen exists for should be the easiest thing on it to
+ * hit — not a 36px pill tucked into a corner.
  */
 const buttonVariants = cva(
   'tap tap-scale inline-flex shrink-0 items-center justify-center gap-2 rounded-xl font-medium outline-none disabled:pointer-events-none disabled:opacity-45 select-none',
@@ -23,11 +27,11 @@ const buttonVariants = cva(
         accentSoft: 'bg-accent-soft text-accent active:opacity-85',
       },
       size: {
-        sm: 'h-9 min-h-9 px-3 text-body',
+        sm: 'h-10 min-h-10 px-3.5 text-body',
         md: 'h-11 min-h-11 px-4 text-row',
-        lg: 'h-12 min-h-12 px-5 text-title',
+        lg: 'h-12 min-h-12 px-5 text-row font-semibold',
         icon: 'h-11 w-11 min-h-11',
-        'icon-sm': 'h-9 w-9 min-h-9',
+        'icon-sm': 'h-10 w-10 min-h-10',
       },
     },
     defaultVariants: { variant: 'surface', size: 'md' },

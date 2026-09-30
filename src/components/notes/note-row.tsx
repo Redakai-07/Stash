@@ -85,7 +85,7 @@ export function NoteRow({
           onOpen();
         }}
         {...handlers}
-        className="tap flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left active:bg-surface-2"
+        className="tap flex min-w-0 flex-1 items-center gap-3 px-4 py-3.5 text-left active:bg-surface-2"
       >
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
@@ -127,9 +127,9 @@ export function NoteRow({
             className="tap flex size-10 items-center justify-center rounded-full active:bg-surface-2"
           >
             <Star
-              size={17}
+              size={18}
               strokeWidth={1.9}
-              className={cn('transition-colors', note.isFavorite ? 'fill-warning text-warning' : 'text-subtle')}
+              className={cn('transition-colors', note.isFavorite ? 'fill-warning text-warning' : 'text-muted')}
               aria-hidden
             />
           </button>
@@ -138,9 +138,9 @@ export function NoteRow({
           type="button"
           onClick={onShowActions}
           aria-label={`${note.title} actions`}
-          className="tap flex size-10 items-center justify-center rounded-full text-subtle active:bg-surface-2"
+          className="tap flex size-10 items-center justify-center rounded-full text-muted active:bg-surface-2"
         >
-          <MoreHorizontal size={18} strokeWidth={2} aria-hidden />
+          <MoreHorizontal size={19} strokeWidth={2} aria-hidden />
         </button>
       </div>
     </div>

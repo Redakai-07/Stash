@@ -16,9 +16,13 @@ import { cn } from '@/lib/utils';
  * a locked folder's name was never stored, so it cannot be shown even by
  * accident.
  *
- * Tapping asks the same question the lock screen does: the device prompt where
- * one is armed, and (for a vault made by an older build) the passcode where it is not. That is the point of keeping
- * the row rather than filtering it out.
+ * The second line says "Tap to unlock" rather than "unlock to read": the row is
+ * asking for a gesture, and it is the only row in the app that does.
+ *
+ * Tapping is what raises the system prompt: the device lock where one is armed, and
+ * (for a vault made by an older build) the passcode where it is not. That is the
+ * point of keeping the row rather than filtering it out — the lock is an
+ * interaction on the item, not a screen in front of the app.
  */
 
 export interface LockedRowProps {
@@ -44,22 +48,25 @@ export function LockedRow({ kind, subtitle, onReveal, busy = false, className }:
         onClick={onReveal}
         disabled={busy}
         aria-label={`${NOUNS[kind]} — unlock to open`}
-        className="tap flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left active:bg-surface-2"
+        className="tap flex min-w-0 flex-1 items-center gap-3 px-4 py-3.5 text-left active:bg-surface-2"
       >
-        <span className="flex size-5 shrink-0 items-center justify-center text-accent">
+        {/* The accent tile is the one visual difference between a locked row and
+            an open one, and it is the same treatment folders get: a row with an
+            identity, not a row with content. */}
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
           {busy ? (
-            <Loader2 size={16} strokeWidth={2} className="animate-spin" aria-hidden />
+            <Loader2 size={18} strokeWidth={2} className="animate-spin" aria-hidden />
           ) : (
-            <Lock size={16} strokeWidth={2} aria-hidden />
+            <Lock size={18} strokeWidth={2} aria-hidden />
           )}
         </span>
         <span className="min-w-0 flex-1">
           <span className="text-row block truncate font-medium text-fg">{NOUNS[kind]}</span>
           <span className="text-meta mt-0.5 block truncate text-subtle">
-            {subtitle ? `${subtitle} · ` : ''}unlock to read
+            {subtitle ? `${subtitle} · ` : ''}Tap to unlock
           </span>
         </span>
-        <ChevronRight size={17} strokeWidth={2} className="shrink-0 text-subtle/70" aria-hidden />
+        <ChevronRight size={18} strokeWidth={2} className="shrink-0 text-subtle" aria-hidden />
       </button>
     </div>
   );
@@ -80,8 +87,9 @@ export function useRevealLocked() {
     async (kind: RevealKind, id: string, next?: () => void) => {
       setBusy(true);
       // `requestReveal` resolves `ok` only when the vault is already unlocked —
-      // the device prompt answered yes. Otherwise it has queued the request and
-      // the gate takes over, and the caller's `next` waits for the next tap.
+      // the device prompt answered yes. Otherwise it has queued the request so the
+      // prompt can explain itself, and the caller's `next` waits for the next tap
+      // rather than opening something that is still unreadable.
       const result = await requestReveal(kind, id);
       setBusy(false);
       if (result.ok) next?.();

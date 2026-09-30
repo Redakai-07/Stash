@@ -12,6 +12,11 @@ import { cn } from '@/lib/utils';
  * phone: Home answers "what did I just save", Library is where structure lives,
  * Notes is where the user's own writing lives, Search finds anything, and
  * Settings holds the rare, destructive things.
+ *
+ * The bar is deliberately tall (64px of touch, plus the safe area) and its
+ * active state is a filled capsule behind the icon *and* the label: the label
+ * carries the meaning, and colouring only the icon makes people hunt for which
+ * tab they are on.
  */
 interface NavItem {
   href: string;
@@ -38,7 +43,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Primary"
-      className="z-40 shrink-0 border-t border-border bg-surface/95 pb-safe backdrop-blur-xl"
+      className="z-40 shrink-0 border-t border-hairline bg-surface/95 pb-safe backdrop-blur-xl"
     >
       <ul className="flex items-stretch">
         {ITEMS.map((item) => {
@@ -49,25 +54,25 @@ export function BottomNav() {
               <Link
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
-                className="tap flex h-14 flex-col items-center justify-center gap-1 rounded-xl"
+                className="tap flex h-16 flex-col items-center justify-center gap-1.5"
               >
                 <span
                   className={cn(
-                    'flex h-7 w-10 items-center justify-center rounded-full transition-colors duration-200',
+                    'flex h-7 w-12 items-center justify-center rounded-full transition-colors duration-200',
                     active ? 'bg-accent-soft' : 'bg-transparent',
                   )}
                 >
                   <TabIcon
-                    size={18}
+                    size={20}
                     strokeWidth={active ? 2.2 : 1.8}
-                    className={cn('transition-colors duration-200', active ? 'text-accent' : 'text-subtle')}
+                    className={cn('transition-colors duration-200', active ? 'text-accent' : 'text-muted')}
                     aria-hidden
                   />
                 </span>
                 <span
                   className={cn(
-                    'text-label leading-none font-medium tracking-tight transition-colors duration-200',
-                    active ? 'text-accent' : 'text-subtle',
+                    'text-label leading-none tracking-tight transition-colors duration-200',
+                    active ? 'font-semibold text-accent' : 'font-medium text-muted',
                   )}
                 >
                   {item.label}

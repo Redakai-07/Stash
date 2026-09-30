@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FolderPlus, Inbox as InboxIcon, Share2 } from 'lucide-react';
+import { ChevronRight, FolderPlus, Inbox as InboxIcon, Share2 } from 'lucide-react';
 import type { Folder, Note, SavedLink } from '@/db/types';
 import { childrenOf } from '@/lib/tree';
 import { pluralize } from '@/lib/format';
@@ -16,7 +16,8 @@ import {
   selectTagUsage,
 } from '@/stores/vault-store';
 import { Button } from '@/components/ui/button';
-import { EmptyState, ListSurface, PageHeader, PageTitle, Section } from '@/components/ui/page';
+import { EmptyState, GroupSurface, ListSurface, PageHeader, PageTitle, Section } from '@/components/ui/page';
+import { LogoMark } from '@/components/ui/logo';
 import { LinkRow } from '@/components/links/link-row';
 import { LinkActionsSheet } from '@/components/links/link-actions-sheet';
 import { FolderRow } from '@/components/folders/folder-row';
@@ -72,7 +73,7 @@ export default function HomePage() {
           subtitle={
             isEmpty
               ? 'Nothing saved yet'
-              : `${pluralize(activeLinks.length, 'link')} · ${pluralize(folders.length, 'folder')} · on this device`
+              : `${pluralize(activeLinks.length, 'link')} saved · ${pluralize(folders.length, 'folder')}`
           }
         >
           Your vault
@@ -85,61 +86,72 @@ export default function HomePage() {
         things already dealt with.
       */}
       {!isEmpty && inbox.length > 0 ? (
-        <Section title="Inbox" action="Organize" actionHref="/inbox" className="mt-3">
-          <div className="px-4">
-            {/*
-              The one deliberate emphasis on Home: the Inbox is the only thing
-              here that is asking the user to do something. It is a filled row
-              rather than a bordered card, so it reads as a prompt instead of
-              another object in the list.
-            */}
-            <Link
-              href="/inbox"
-              className="tap flex items-center gap-3 rounded-control bg-accent-soft px-4 py-3 active:opacity-90"
-            >
-              <InboxIcon size={18} strokeWidth={1.9} className="shrink-0 text-accent" aria-hidden />
-              <span className="min-w-0 flex-1">
-                <span className="block text-row font-semibold text-accent">
-                  {pluralize(inbox.length, 'link')} waiting to be organized
-                </span>
-                <span className="mt-0.5 block truncate text-meta text-accent/80">
-                  {inbox
-                    .slice(0, 2)
-                    .map((link) => link.title?.trim() || link.source || link.url)
-                    .join(' · ')}
-                  {inbox.length > 2 ? ` +${inbox.length - 2} more` : ''}
-                </span>
+        <Section title="Inbox" action="Organize" actionHref="/inbox" className="mt-4">
+          {/*
+            The one deliberate emphasis on Home: the Inbox is the only thing here
+            asking the user to do something, so it gets the accent tile and the
+            accent-soft icon — the same sentence the rest of the app says about
+            the current thing — while the rows around it stay quiet.
+          */}
+          <Link href="/inbox" className="tap card mx-4 flex items-center gap-3 px-4 py-3.5 active:bg-surface-2">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
+              <InboxIcon size={19} strokeWidth={1.9} aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="text-row block font-semibold text-fg">
+                {pluralize(inbox.length, 'link')} waiting to be filed
               </span>
-            </Link>
-          </div>
+              <span className="text-meta mt-0.5 block truncate text-muted">
+                {inbox
+                  .slice(0, 2)
+                  .map((link) => link.title?.trim() || link.source || link.url)
+                  .join(' · ')}
+                {inbox.length > 2 ? ` +${inbox.length - 2} more` : ''}
+              </span>
+            </span>
+            <ChevronRight size={18} strokeWidth={2} className="shrink-0 text-subtle" aria-hidden />
+          </Link>
         </Section>
       ) : null}
 
       {isEmpty ? (
-        <div className="px-4 pt-6">
+        <>
           <EmptyState
-            title="Save something worth coming back to."
-            description="Share a link to Stash from any app, or add one by hand with the + button. Nothing has to be filed, named or sorted — it goes to the Inbox and waits. Everything stays on this device."
+            icon={<LogoMark size={22} />}
+            title="Nothing saved yet"
+            description="Stash is a quiet place for the links and notes you mean to keep. Everything lives on this device — no account, no cloud, nothing to sync."
           />
-          <div className="mt-8 border-t border-hairline pt-4">
-            <p className="flex items-center gap-2 text-row font-semibold text-fg">
-              <Share2 size={16} strokeWidth={1.9} className="text-accent" aria-hidden />
-              Save from another app
-            </p>
-            <ol className="text-meta mt-2.5 flex flex-col gap-1.5 leading-relaxed text-muted">
-              <li>
-                <span className="font-medium text-fg">1.</span> Find a video, post or article you want to keep.
-              </li>
-              <li>
-                <span className="font-medium text-fg">2.</span> Tap that app&apos;s Share button.
-              </li>
-              <li>
-                <span className="font-medium text-fg">3.</span> Choose <span className="font-medium text-fg">Stash</span>{' '}
-                — the save sheet opens straight away.
-              </li>
-            </ol>
-          </div>
-        </div>
+          {/*
+            Two things a new user has to know, said as two rows rather than a
+            numbered manual: where links come from, and that nothing has to be
+            filed. The + button and the share flow are the whole product, so this
+            is the only onboarding there is.
+          */}
+          <GroupSurface className="mt-2">
+            <div className="flex items-start gap-3 px-4 py-3.5">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
+                <Share2 size={19} strokeWidth={1.9} aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <p className="text-row font-medium text-fg">Save a link from any app</p>
+                <p className="text-meta mt-0.5 leading-relaxed text-muted">
+                  Tap Share in the app you are reading in and choose Stash. The link arrives in your Inbox.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 px-4 py-3.5">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-muted">
+                <FolderPlus size={19} strokeWidth={1.9} aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <p className="text-row font-medium text-fg">Or add one by hand</p>
+                <p className="text-meta mt-0.5 leading-relaxed text-muted">
+                  The + button saves a link without filing it. Folders can wait.
+                </p>
+              </div>
+            </div>
+          </GroupSurface>
+        </>
       ) : (
         <>
           <Section title="Recent" action="See all" actionHref="/search">
@@ -157,24 +169,25 @@ export default function HomePage() {
                 ))}
               </ListSurface>
             ) : (
-              <p className="px-4 py-3 text-meta text-muted">Nothing saved yet.</p>
+              <p className="text-body px-4 py-4 text-muted">Nothing here yet.</p>
             )}
           </Section>
 
           {favoriteFolders.length > 0 ? (
             <Section title="Favorite folders">
               {/*
-                Plain names, not star-pill chips. The section is already called
-                "Favorite folders", so a star on every item only repeats the
-                heading, and a row of bordered pills is the most template-looking
-                element the app could have.
+                Soft chips, not bordered pills: no outline, no star repeating the
+                section heading, just a warm surface someone can hit with a thumb.
+                Favourite folders are the one place on Home where a set of short
+                names wraps instead of forming a list, and a chip is the shape
+                that says "tap me" without drawing a box.
               */}
-              <div className="flex flex-wrap gap-x-5 gap-y-2 px-4">
+              <div className="flex flex-wrap gap-2 px-4">
                 {favoriteFolders.map((folder) => (
                   <Link
                     key={folder.id}
                     href={`/library?folder=${folder.id}`}
-                    className="tap text-body font-medium text-fg active:text-accent"
+                    className="tap text-body bg-surface-2 rounded-full px-3.5 py-2 font-medium text-fg active:bg-surface-3"
                   >
                     {folder.name}
                   </Link>
@@ -210,18 +223,18 @@ export default function HomePage() {
 
           {tags.length > 0 ? (
             <Section title="Tags" action="Search" actionHref="/search">
-              <div className="scroll-area flex flex-wrap gap-x-5 gap-y-2 overflow-x-auto px-4">
+              <div className="scroll-area flex flex-wrap gap-2 overflow-x-auto px-4">
                 {tags.slice(0, 12).map((tag) => (
                   <Link
                     key={tag.name}
                     href={`/search?q=${encodeURIComponent(tag.name)}`}
-                    className="tap flex shrink-0 items-baseline gap-1.5 active:text-accent"
+                    className="tap text-body bg-surface-2 flex shrink-0 items-baseline gap-1.5 rounded-full px-3.5 py-2 font-medium text-fg active:bg-surface-3"
                   >
-                    <span className="text-body font-medium text-fg">
+                    <span>
                       <span className="text-subtle">#</span>
                       {tag.name}
                     </span>
-                    <span className="text-label text-subtle">{tag.count}</span>
+                    <span className="text-meta text-subtle">{tag.count}</span>
                   </Link>
                 ))}
               </div>
@@ -260,24 +273,31 @@ export default function HomePage() {
               </div>
             )}
 
-            <div className="flex flex-col gap-2 px-4 pt-2">
-              <Link
-                href="/inbox"
-                className="tap flex items-center gap-2 rounded-xl border border-dashed border-border-strong px-3 py-2.5 text-body font-medium text-accent active:bg-surface-2"
-              >
-                <InboxIcon size={16} strokeWidth={1.9} aria-hidden />
-                {inbox.length > 0
-                  ? `Inbox · ${pluralize(inbox.length, 'link')} to organize`
-                  : 'Inbox · nothing waiting'}
+            {/*
+              Two ways out of Home, as two rows on one card. They used to be
+              dashed-outline buttons, which read as wireframe: a dashed border is
+              what a design tool draws for "something goes here".
+            */}
+            <GroupSurface className="mt-3">
+              <Link href="/inbox" className="tap flex items-center gap-3 px-4 py-3.5 active:bg-surface-2">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-muted">
+                  <InboxIcon size={19} strokeWidth={1.9} aria-hidden />
+                </span>
+                <span className="text-row min-w-0 flex-1 truncate font-medium text-fg">Inbox</span>
+                <span className="text-meta shrink-0 text-muted">
+                  {inbox.length > 0 ? pluralize(inbox.length, 'link') : 'Empty'}
+                </span>
+                <ChevronRight size={18} strokeWidth={2} className="shrink-0 text-subtle" aria-hidden />
               </Link>
-              <Link
-                href="/library"
-                className="tap flex items-center gap-2 rounded-xl border border-dashed border-border-strong px-3 py-2.5 text-body font-medium text-accent active:bg-surface-2"
-              >
-                <FolderPlus size={16} strokeWidth={1.9} aria-hidden />
-                Open the full folder tree
+              <Link href="/library" className="tap flex items-center gap-3 px-4 py-3.5 active:bg-surface-2">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-muted">
+                  <FolderPlus size={19} strokeWidth={1.9} aria-hidden />
+                </span>
+                <span className="text-row min-w-0 flex-1 truncate font-medium text-fg">Browse folders</span>
+                <span className="text-meta shrink-0 text-muted">{folders.length}</span>
+                <ChevronRight size={18} strokeWidth={2} className="shrink-0 text-subtle" aria-hidden />
               </Link>
-            </div>
+            </GroupSurface>
           </Section>
         </>
       )}

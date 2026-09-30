@@ -16,26 +16,54 @@ Screens compose those; they do not invent new visual vocabulary.
 
 ## 1. The direction
 
-**A quiet, tactile drawer of things worth keeping.**
+**Paper and ink: a warm, quiet drawer of things worth keeping.**
 
 Stash is a private utility someone opens many times a day to file something or
-find something. It is not a dashboard, not a social product, not a showcase. The
-interface should feel like a well-made index card box: plain, sturdy, and
-precise, with everything in its place.
+find something. It is not a dashboard, not a social product, not a showcase. It
+should feel like a well-made notebook that is *pleased* to be used: warm paper,
+warm ink, generous type, everything in its place.
 
-Three rules produce everything else:
+Four rules produce everything else:
 
-1. **Hierarchy is typographic.** Size, weight, position and space carry it.
-   Remove nearly every border from a screen and it must still read.
-2. **Depth is a step plus a hairline.** Surfaces differ by a barely-perceptible
-   tone; the line between them does the grouping. Large filled containers are
-   reserved for things genuinely raised off the page.
-3. **Colour is a signal.** One accent for the primary action and the current
+1. **Warm neutrals, never blue-grey.** Every neutral in the palette carries a
+   little amber. Cool grey is what makes an interface read as a developer tool;
+   the same layout in warm paper reads as an object someone chose.
+2. **Hierarchy is typographic.** Size, weight, position and space carry it. A
+   screen with its containers removed must still be understandable.
+3. **Group, do not rule.** Things that belong together sit on one soft card with
+   hairlines inside it. Full-bleed rules across a screen are a spreadsheet.
+4. **Colour is a signal.** One accent for the primary action and the current
    selection; semantic colours only where meaning demands them.
 
 Corollary: **design from content, not from components.** Start with "what does
 the user need to know here", not "I need a Card". A folder is a name, a count
 and a way in — that is a row, not a tile.
+
+### The mark
+
+**A kept ribbon:** a bookmark whose notch is a soft curve rather than a sharp V,
+in cream on a deep pine tile (`brand_cream` on `brand_ink`). It says what the app
+is for — things you mean to keep — and it is one flat shape, so it reads at 16px
+in a tab bar and at 192px on a home screen with no second colour, no gradient and
+no shadow.
+
+Rules:
+
+- **There is one mark.** It appears on the launch screen, in the settings
+  sign-off, on an empty Home, and as the app icon. Nowhere else — a logo in a page
+  header is decoration, and the app already has a title.
+- **It is drawn, not imported.** `src/components/ui/logo.tsx` renders it from the
+  same path as the icons, in `currentColor`, so it is crisp at any size and
+  follows the theme without a second asset. Do not add a PNG of the mark to the
+  interface.
+- **Icon assets are generated.** `public/icons/{icon,maskable,foreground}.svg`
+  are the masters; `node scripts/make-icons.mjs` writes every PNG (favicon,
+  apple-touch, PWA, Android launcher and adaptive foreground). Never hand-edit a
+  generated PNG — edit the master and re-run the script.
+- **The tile is the same in both themes.** The app icon is shown next to other
+  apps, not inside Stash, so it does not follow the theme. `--brand-ink` and
+  `--brand-cream` exist for that reason and are the only fixed colours in the
+  system.
 
 ---
 
@@ -47,11 +75,21 @@ none of them may be added:
 - gradient hero cards, gradient buttons, gradient text, "AI purple/blue" palettes;
 - glassmorphism, glowing borders, floating blobs, decorative sparkles;
 - a container around every element: card-inside-card, a box per list row, a
-  rounded tile behind every icon;
+  rounded tile behind every icon. (A tile behind an *entity's own icon* is the one
+  exception and it is already spent: folders. Links and notes are content and
+  stay bare — a rounded square with an initial in it is the most recognisable
+  generated-UI flourish there is.)
 - `rounded-2xl` on everything (see §5 — shape is a vocabulary);
 - random icon colours, or an icon on every label "for balance";
-- giant page titles and oversized headings that push content below the fold;
-- pill-shaped chips for everything, badge soup, stat tiles, dashboards, scores;
+- **hairline rules across a full screen**, and `border-dashed` anything: a dashed
+  outline is what a design tool draws for "something goes here";
+- headings that push content below the fold. (A 28px page title on a phone is
+  not oversized — it is the difference between an app and a form. A hero band or
+  an illustration above it is.)
+- bordered pill chips for every metadata value. Soft chips (`bg-surface-2`,
+  `rounded-full`, no outline) are allowed for a wrapped set of short names, which
+  is the one shape that works for "favourite folders" and tags;
+- badge soup, stat tiles, dashboards, scores;
 - excessive explanatory copy, duplicated labels (title + subtitle saying the
   same thing), all-uppercase section labels with wide tracking;
 - animation for its own sake: on-load floats, staggered reveals, bouncing icons,
@@ -69,22 +107,29 @@ Six steps, each with one job. New UI picks a step; it never picks a raw size.
 
 | Token         | Size | Job                                            |
 | ------------- | ---- | ---------------------------------------------- |
-| `text-display`| 21px | the page title — one per screen                |
-| `text-title`  | 16px | sheet and dialog titles                        |
-| `text-row`    | 15px | list-item titles (the most common text)        |
-| `text-body`   | 14px | prose the user reads or writes                 |
-| `text-meta`   | 13px | the secondary line under a row title           |
-| `text-label`  | 12px | section labels                                 |
+| `text-display`| 28px | the page title — one per screen                |
+| `text-title`  | 19px | sheet and dialog titles, the wordmark          |
+| `text-row`    | 16px | list-item titles (the most common text)        |
+| `text-body`   | 15px | prose the user reads or writes                 |
+| `text-meta`   | 13.5px | the secondary line under a row title         |
+| `text-label`  | 13px | section labels                                 |
 
 Rules:
 
-- Weight does the emphasis: `font-semibold` for titles, `font-medium` for row
-  titles, regular for prose. Avoid bold-everywhere.
-- Section labels are sentence case, no letter-spacing, `text-subtle`. They are
-  signposts, not eyebrows.
+- **Nothing is smaller than 13px, and nothing important is smaller than 15px.**
+  A phone's type is not a desktop's: text that is legible on a 27" display is a
+  squint in daylight on a bus.
+- Weight does the emphasis: `font-semibold` for titles and section labels,
+  `font-medium` for row titles, regular for prose. Avoid bold-everywhere.
+- Section labels are sentence case, no letter-spacing, `font-semibold`,
+  `text-muted` — *not* `text-subtle`. A signpost has to be readable; that was the
+  bug in the old scale, where labels looked like something to skip.
 - Two weights of secondary ink: `text-muted` for content the user reads,
-  `text-subtle` for metadata that is never load-bearing. Do not stack three
-  greys in one row.
+  `text-subtle` for metadata that is never load-bearing. Do not stack three greys
+  in one row.
+- **Every text colour clears 4.5:1 against every surface it can sit on**, in both
+  themes — including `text-subtle`. Re-check with the pair table when a palette
+  value changes; "metadata" is not a licence to be unreadable.
 - Truncate, never wrap, in rows. A row is one line of title plus one line of
   metadata, full stop.
 
@@ -92,11 +137,15 @@ Rules:
 
 ## 4. Spacing and density
 
-- 4px base unit. In practice: `px-4` page gutter, `py-3` row padding, `gap-3`
-  inside a row, `mt-7` between sections, `pb-1` under a section label.
-- Rows are compact on purpose. Twenty links must fit on a phone screen; every
-  pixel spent on air is a link the user has to scroll for.
-- One gutter everywhere (16px), so lists line up from screen to screen.
+- 4px base unit. In practice: `px-4` page gutter, `py-3.5` row padding, `gap-3`
+  inside a row, `mt-8` between sections, `pb-2` under a section label.
+- **Rows are comfortable, not crammed**: a row with two lines of text is ~70px,
+  which is a 44px touch target with air around it. The old density fitted more
+  links per screen and made the app feel like a table; scrolling one extra screen
+  is a fair price for a list that is pleasant to read.
+- One gutter everywhere (16px), so lists line up from screen to screen. Cards are
+  inset by exactly that gutter (`mx-4`), so a card's edge is never confused with
+  the screen's edge.
 - A row is: title line, optional metadata line, optional trailing controls.
   Nothing else.
 
@@ -104,43 +153,54 @@ Rules:
 
 ## 5. Shape
 
-Radius is a vocabulary with three words, not a default:
+Radius is a vocabulary with four words, not a default:
 
-| Token                | Use                                                     |
-| -------------------- | ------------------------------------------------------- |
-| `rounded-tap`  (8px) | controls *inside* content (a small inline button)        |
-| `rounded-xl`  (10px) | a real button or a field                                 |
-| `rounded-2xl` (16px) | a surface that floats above the page (sheet, dialog)     |
-| — none —             | content rows and grouped lists; hairlines, not corners   |
+| Token                  | Use                                                     |
+| ---------------------- | ------------------------------------------------------- |
+| `rounded-tap`   (10px) | controls *inside* content (a small inline button)        |
+| `rounded-control`(14px)| a real button, a field, an icon tile                     |
+| `rounded-2xl`  (20px)  | a group of rows — use the `card` utility, not the class  |
+| `rounded-surface` (28px)| a sheet or a dialog that floats above the page          |
 
-The fourth role is the absence of a class. A list row is square with a hairline
-under it. Tailwind's stock steps are retuned so a stray `rounded-2xl` cannot
-reintroduce a louder shape.
+A list is a `card`: one soft edge around rows that belong together, with
+hairlines *inside* it. The first and last row are clipped by the radius, which is
+why `card` sets `overflow-hidden`.
 
-`rounded-full` is reserved for: the primary floating action, the grab handle, and
-circular icon buttons in a row (`size-10`). That is the whole list.
+`rounded-full` is reserved for: the floating action button, the sheet grab
+handle, circular icon buttons in a row (`size-10`), the active tab's icon capsule,
+and soft chips. That is the whole list.
+
+Generous radii are not decoration. A 20px corner and a 44px button are what make
+an interface feel touchable rather than drawn — and touchability is most of what
+"friendly" means.
 
 ---
 
 ## 6. Colour and surface
 
-One accent — ink-indigo — used for: the primary action, the current selection,
-links-in-context, focus, and nothing else. Away from that: neutral.
+One accent — **deep pine** (`#0b6b58` light, `#5dcbaf` dark) — used for: the
+primary action, the current selection, links-in-context, focus, and nothing else.
+Away from that: warm neutral.
 
 Surfaces, in a deliberately small ladder (light → dark):
 
-- `bg` — the paper. What most of the screen is.
-- `surface` — chrome raised off the paper: sheets, bars, toasts, grouped blocks.
-- `surface-2` — an inset: a field, a pressed row, a well.
+- `bg` — the paper (`#faf8f4` / `#151714`). What most of the screen is.
+- `surface` — chrome raised off the paper: cards, sheets, bars, toasts.
+- `surface-2` — an inset: a field, an icon tile, a chip, a pressed row.
 - `surface-3` — one step further in, for pressed states of insets.
+
+The two brand colours (`brand_ink` `#182a24`, `brand_cream` `#f6f1e7`) are fixed
+in both themes: they belong to the icon, which is not inside the app.
 
 Semantic colours are used only when they mean something: `danger` for
 destructive actions and a link the user marked dead; `warning` for a favourite
 star; `success` for a confirmation toast. Never for variety.
 
 Dark mode is not inverted light mode and is never `#000`. Surfaces step
-`oklch(0.155 → 0.185 → 0.212 → 0.248)`, so depth reads as material rather than
-as holes. Text tops out just below pure white.
+`#151714 → #1d1f1b → #252721 → #30322b`, so depth reads as material rather than
+as holes, and the paper stays warm. Text tops out just below pure white, and the
+accent lightens rather than darkens: a deep pine becomes invisible against a dark
+background, so dark mode uses mint.
 
 Both themes are defined once in `src/app/globals.css`; components never branch on
 theme. `color-scheme` follows the resolved theme, and `--chrome-gap` (§10) is
@@ -228,6 +288,27 @@ padding-top: calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + va
 not the device's, via `syncSystemBars` (§`src/lib/system-bars.ts`). A light app
 on a dark device would otherwise get dark icons on a dark background.
 
+**No native chrome, ever.** The window belongs to the app and the app draws all
+of it. Three rules, because each of them has already been broken once and each
+failure looks the same on a phone — a bar at the top that nobody designed:
+
+- **Both themes are no-action-bar themes, and the theme is claimed before any
+  other window work** (`setTheme` first in `MainActivity.onCreate`, before
+  `EdgeToEdge.enable`). AppCompat installs an ActionBar — titled with the
+  activity label, which is the app's name — from whatever theme is current when
+  the window's decor is first inflated, and one installed from the launch theme
+  survives the later swap.
+- **The window background is a flat colour, never a bitmap**
+  (`color/stash_window_background`, day/night variants in
+  `android/app/src/main/res/values{-night}/colors.xml`, matching the `bg`
+  token). The window background is the one surface CSS cannot paint: it shows
+  wherever the WebView does not cover the window — before the first frame, and in
+  the strip Capacitor reserves natively on WebViews too old to report their own
+  insets. A splash *image* there becomes a band of that image above the app's own
+  content. `@drawable/splash` is therefore referenced by no theme.
+- **Never set a window title or a toolbar**, and never assume `android:label`
+  (used by the share sheet, which should say "Stash") renders inside the app.
+
 **Back button.** Back is owned by the app, in this order:
 
 1. close the topmost overlay (the overlay stack in `src/lib/overlays.ts`);
@@ -251,17 +332,47 @@ other part of the system.
   timestamp it still knows, and "unlock to read". Nothing on that row is derived
   from the content, because none of it exists in the clear: a locked folder's
   name was never stored.
-- **Tapping it asks the same question the lock screen does** — the device prompt
-  where one is armed (`BiometricPrompt` on Android, Windows Hello on desktop),
-  the passcode where it is not. Never a silent no-op, never a dead end.
-- **The prompt comes first and runs on arrival** on the lock gate, because the
-  point of a device lock is that there is nothing to type. The passcode sits
-  underneath it, behind one tap, named "Use your Stash passcode".
+- **Stash has no lock screen, and asking for a password to open it is a bug.**
+  The app opens like any other app; what is locked is *content*. A locked folder
+  is simply not readable — its name was never stored — and that is the whole of
+  what "locked" looks like on screen. There is no full-screen gate over the app,
+  no boot prompt, and no password to get in.
+- **Tapping a locked row is what raises the system prompt** — `BiometricPrompt`
+  (which offers the phone's PIN/pattern for free) on Android, Windows Hello on a
+  PC. It is the app's only prompt, and it appears where the user pointed: on the
+  item. The dialog (`lock-gate.tsx`) is a *reveal* prompt, never a gate — it is
+  shown when a tap on a locked item did not get answered, which is also the only
+  moment a message about a failed or cancelled prompt belongs on screen.
+- **An unlock is the session, and the session is the tab.** Passing the prompt
+  unlocks *everything* locked, because there is one vault key and one lock state:
+  folders the user has not touched open too. It ends on the next tab change and
+  the moment the app stops being on screen — which is what "they locked the
+  phone" looks like from inside — so there is no timeout to configure and no copy
+  may imply the unlock is permanent. The one navigation exempted is the one the
+  unlock itself caused (opening the folder that was just unlocked), and it is
+  exempted by the grace window in `src/lib/privacy/session.ts`, not by a rule the
+  user has to understand.
+- **A share is never behind the prompt.** Saving a shared link is an ordinary
+  capture into an ordinary folder; it must work with a locked vault and must
+  never open, or wait on, an unlock.
+- **There is exactly one way in, and no passcode.** Stash keeps no passcode of
+  its own — no setup screen offers one, no settings row adds or changes one, and
+  no copy may imply one exists. The system prompt is the gate the device already
+  trusts, and someone who cannot pass it does not read the locked items; that is
+  the design, not a gap in it. The one exception is a vault created by an older
+  build, whose key is wrapped by a passcode and by nothing else: its gate shows a
+  passcode field, because that field is the only thing standing between the user
+  and permanently unreadable content. Nothing writes a passcode any more, so the
+  copy must speak about it in the past tense ("the passcode this vault was
+  created with").
 - **Name the platform dialog.** "Windows Hello or your device PIN" on a PC,
   "your fingerprint, face or phone PIN" on a phone. Never "biometrics".
 - **Say what it costs, at the moment it is chosen.** A vault locked by the device
-  alone has no second way in; the copy says so beside the button, not in a help
-  page.
+  alone has no second way in and no reset, and a backup of it carries no key:
+  the copy says so beside the button, not in a help page. Two consequences are
+  stated wherever they bite — clearing the app's data or losing the device makes
+  locked items unreadable forever, and a backup written by such a vault can only
+  open its locked items on the device that wrote it.
 - Locked rows never appear in search results, are never offered as a move
   destination, and are never used for duplicate detection.
 

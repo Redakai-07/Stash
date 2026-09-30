@@ -213,7 +213,7 @@ function ReviewView() {
           ) : null}
 
           {/* Mode -------------------------------------------------------- */}
-          <div className="overflow-hidden rounded-control border border-hairline bg-surface">
+          <div className="card">
             <ModeRow
               active={mode === 'merge'}
               onClick={() => void setMode('merge')}

@@ -3,20 +3,23 @@
 /*
  * Stash design tokens.
  *
- * The direction is "index card": a quiet, utilitarian drawer of things worth
- * keeping. Hierarchy is carried by *type* — size, weight, position — and by
- * *hairlines*, not by containers, shadows and rounded tiles. If nearly every
- * border in a screen were removed it should still read.
+ * The direction is **paper and ink**: a warm, quiet drawer of things worth
+ * keeping. Warm off-white paper, warm near-black ink, one deep pine accent, and
+ * grouped content on soft cards instead of a spreadsheet of hairlines.
  *
- * Three rules follow from that and everything below serves them:
+ * Four rules, and everything below serves them:
  *
- *  1. **No grey slabs.** Depth comes from a near-invisible surface step plus a
- *     hairline. Large filled containers are reserved for things that are
- *     genuinely raised: sheets and toasts.
- *  2. **Shape means something.** Radius is a vocabulary with three words, not a
- *     single default applied to everything (see the radius roles below).
- *  3. **Colour is a signal.** One accent, used only for the action or the
- *     selection. Semantic red/amber/green appear only where meaning requires.
+ *  1. **Warm neutrals, never blue-grey.** Every neutral carries a little amber
+ *     (hue ~85). Cool grey is what made the app read as a developer tool; a warm
+ *     paper tone is the same layout with a pulse.
+ *  2. **Type does the work.** Five comfortable steps instead of seven cramped
+ *     ones: a confident page title, 16px list titles, 15px prose. Nothing in the
+ *     app is smaller than 13px, and nothing important is smaller than 15px.
+ *  3. **Group, do not rule.** Content that belongs together sits on one soft card
+ *     (radius, hairline, near-invisible shadow) with hairline dividers inside it.
+ *     One level of grouping — a card inside a card is still wrong.
+ *  4. **Colour is a signal.** One accent for the action and the selection.
+ *     Semantic red/amber/green appear only where meaning requires.
  */
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -28,47 +31,62 @@
    * a large step reads as "grey card floating on the page", which is the look
    * being avoided.
    */
-  --bg: oklch(0.975 0.003 265);
-  --surface: oklch(1 0 0);
-  --surface-2: oklch(0.958 0.004 265);
-  --surface-3: oklch(0.932 0.005 265);
+  --bg: #faf8f4;
+  --surface: #ffffff;
+  --surface-2: #f3f0ea;
+  --surface-3: #e9e4da;
 
   /* --- Text ---------------------------------------------------------------
    * Three weights of ink, each with one job. `muted-fg` is the honest
-   * secondary; `subtle-fg` is metadata only and is never load-bearing.
+   * secondary; `subtle-fg` is metadata only and is never load-bearing — but it
+   * still clears 4.5:1, because metadata on a phone in daylight is not optional
+   * information.
    */
-  --fg: oklch(0.225 0.012 265);
-  --muted-fg: oklch(0.5 0.013 265);
-  --subtle-fg: oklch(0.645 0.011 265);
+  --fg: #1f1d19;
+  --muted-fg: #5a564d;
+  --subtle-fg: #726d62;
 
   /* --- Lines --------------------------------------------------------------
-   * `hairline` separates content (a list, a section). `border` outlines a
-   * control the user can touch. Keeping them distinct is what stops every row
-   * from needing a box.
+   * `hairline` separates content inside a group (a list, a card). `border`
+   * outlines a control the user can touch. Keeping them distinct is what stops
+   * every row from needing a box.
    */
-  --hairline: oklch(0.9 0.005 265);
-  --border: oklch(0.885 0.006 265);
-  --border-strong: oklch(0.83 0.008 265);
+  --hairline: #ebe6dc;
+  --border: #d9d3c6;
+  --border-strong: #bdb4a2;
 
   /* --- Accent -------------------------------------------------------------
-   * Ink-indigo. Used for: the one primary action, the current selection, and
-   * focus. Never for decoration.
+   * Deep pine. Used for: the one primary action, the current selection, and
+   * focus. Never for decoration. It is the colour of the app icon's tile family,
+   * which is what makes the logo and the interface read as one thing.
    */
-  --accent: oklch(0.52 0.165 272);
-  --accent-hover: oklch(0.465 0.165 272);
-  --accent-fg: oklch(0.995 0 0);
-  --accent-soft: oklch(0.945 0.025 272);
+  --accent: #0b6b58;
+  --accent-hover: #085545;
+  --accent-fg: #ffffff;
+  --accent-soft: #ddf0e9;
+
+  /* --- Brand --------------------------------------------------------------
+   * Fixed, theme-independent. The icon is the same object in light and dark, and
+   * the mark on it is cream on ink in both.
+   */
+  --brand-ink: #182a24;
+  --brand-cream: #f6f1e7;
 
   /* --- Semantic ---------------------------------------------------------- */
-  --danger: oklch(0.55 0.19 27);
-  --danger-soft: oklch(0.95 0.032 27);
-  --success: oklch(0.55 0.13 152);
-  --warning: oklch(0.66 0.13 72);
+  --danger: #b4231b;
+  --danger-soft: #fbe8e4;
+  --success: #1b7a4b;
+  --warning: #a9741a;
 
-  --overlay: oklch(0.2 0.012 265 / 0.32);
-  /* One shadow in the system, for surfaces that are genuinely above the page. */
-  --shadow-sheet: 0 -12px 48px oklch(0.2 0.012 265 / 0.14);
-  --shadow-raised: 0 2px 10px oklch(0.2 0.012 265 / 0.1);
+  --overlay: rgb(31 29 25 / 0.34);
+  /*
+   * Three shadows, each with a job: a sheet is above everything, a raised
+   * surface is a button off the page, and a card is content that has an edge.
+   * All three are warm-tinted rather than black, so they sit in the paper.
+   */
+  --elevation-sheet: 0 -16px 48px rgb(31 29 25 / 0.16);
+  --elevation-raised: 0 2px 12px -2px rgb(31 29 25 / 0.14);
+  --elevation-card: 0 1px 2px rgb(31 29 25 / 0.04), 0 10px 24px -16px rgb(31 29 25 / 0.14);
 
   /* --- System chrome ------------------------------------------------------
    * The air kept between the app's own chrome and the system bars, *on top of*
@@ -82,33 +100,34 @@
 }
 
 .dark {
-  --bg: oklch(0.155 0.004 265);
-  --surface: oklch(0.185 0.005 265);
-  --surface-2: oklch(0.212 0.006 265);
-  --surface-3: oklch(0.248 0.007 265);
+  --bg: #151714;
+  --surface: #1d1f1b;
+  --surface-2: #252721;
+  --surface-3: #30322b;
 
   /* Not pure white, and not pure black behind it. */
-  --fg: oklch(0.955 0.003 265);
-  --muted-fg: oklch(0.7 0.011 265);
-  --subtle-fg: oklch(0.575 0.011 265);
+  --fg: #f1eee7;
+  --muted-fg: #a8a498;
+  --subtle-fg: #938e82;
 
-  --hairline: oklch(0.268 0.006 265);
-  --border: oklch(0.3 0.007 265);
-  --border-strong: oklch(0.375 0.009 265);
+  --hairline: #2a2c26;
+  --border: #3c3e36;
+  --border-strong: #55574c;
 
-  --accent: oklch(0.72 0.135 272);
-  --accent-hover: oklch(0.78 0.125 272);
-  --accent-fg: oklch(0.17 0.03 272);
-  --accent-soft: oklch(0.27 0.045 272);
+  --accent: #5dcbaf;
+  --accent-hover: #7bdfc4;
+  --accent-fg: #07231d;
+  --accent-soft: #16332b;
 
-  --danger: oklch(0.68 0.17 27);
-  --danger-soft: oklch(0.268 0.055 27);
-  --success: oklch(0.7 0.13 152);
-  --warning: oklch(0.76 0.12 72);
+  --danger: #e98c84;
+  --danger-soft: #3a2320;
+  --success: #6fd39b;
+  --warning: #dfb25a;
 
-  --overlay: oklch(0.08 0 0 / 0.62);
-  --shadow-sheet: 0 -12px 48px oklch(0 0 0 / 0.55);
-  --shadow-raised: 0 2px 12px oklch(0 0 0 / 0.45);
+  --overlay: rgb(6 8 6 / 0.62);
+  --elevation-sheet: 0 -16px 48px rgb(0 0 0 / 0.5);
+  --elevation-raised: 0 2px 12px -2px rgb(0 0 0 / 0.45);
+  --elevation-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 24px -16px rgb(0 0 0 / 0.5);
   color-scheme: dark;
 }
 
@@ -132,54 +151,65 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-overlay: var(--overlay);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-cream: var(--brand-cream);
 
   /*
    * --- Type scale ---------------------------------------------------------
    * Six steps, each with one job. New UI picks a step; it does not pick a
    * number. A seventh size is how a design language dissolves.
    *
-   *   display  21px  page title, one per screen
-   *   title    16px  sheet titles, dialog headings
-   *   row      15px  list-item titles (the most common text in the app)
-   *   body     14px  prose the user reads or writes
-   *   meta     13px  the secondary line under a row title
-   *   label    12px  section labels — sentence case, never uppercased
+   *   display  28px  page title, one per screen
+   *   title    19px  sheet titles, dialog headings, the wordmark
+   *   row      16px  list-item titles (the most common text in the app)
+   *   body     15px  prose the user reads or writes
+   *   meta    13.5px the secondary line under a row title
+   *   label    13px  section labels — sentence case, never uppercased
+   *
+   * These are a phone's sizes, not a desktop's: a 28px title is what makes a
+   * screen feel like an app rather than a form, and 16px rows are what make a
+   * list comfortable to read while walking. The previous scale ran two steps
+   * smaller throughout, which is most of why the app read as a tool.
    */
-  --text-display: 1.3125rem;
-  --text-display--line-height: 1.2;
-  --text-display--letter-spacing: -0.02em;
-  --text-title: 1rem;
-  --text-title--line-height: 1.3;
-  --text-title--letter-spacing: -0.011em;
-  --text-row: 0.9375rem;
+  --text-display: 1.75rem;
+  --text-display--line-height: 1.15;
+  --text-display--letter-spacing: -0.022em;
+  --text-title: 1.1875rem;
+  --text-title--line-height: 1.25;
+  --text-title--letter-spacing: -0.015em;
+  --text-row: 1rem;
   --text-row--line-height: 1.35;
-  --text-body: 0.875rem;
+  --text-row--letter-spacing: -0.005em;
+  --text-body: 0.9375rem;
   --text-body--line-height: 1.5;
-  --text-meta: 0.8125rem;
+  --text-meta: 0.84375rem;
   --text-meta--line-height: 1.4;
-  --text-label: 0.75rem;
+  --text-label: 0.8125rem;
   --text-label--line-height: 1.3;
 
   /*
    * --- Radius roles -------------------------------------------------------
-   * Three words. `tap` is a control that sits *inside* content. `control` is a
-   * button or a field. `surface` is an overlay, and only an overlay. Content
-   * rows and grouped lists are square and separated by a hairline — that is the
-   * fourth role, and it is expressed by the absence of a class.
+   * Four words. `tap` is a control that sits *inside* content. `control` is a
+   * button or a field. `card` is a group of rows. `surface` is an overlay, and
+   * only an overlay. Generous radii are what make an interface feel touchable
+   * rather than drawn, which is why these are larger than they look in a mockup.
    */
-  --radius-tap: 0.5rem;
-  --radius-control: 0.625rem;
-  --radius-surface: 1rem;
+  --radius-tap: 0.625rem;
+  --radius-control: 0.875rem;
+  --radius-card: 1.25rem;
+  --radius-surface: 1.75rem;
+  --radius-sheet: 1.75rem;
 
   /* Tailwind's stock steps are retuned so a stray `rounded-xl` cannot
-   * reintroduce a fourth, louder shape. */
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.625rem;
-  --radius-2xl: 1rem;
-  --radius-3xl: 1.25rem;
+   * reintroduce a fifth, different shape. */
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.25rem;
+  --radius-3xl: 1.75rem;
 
-  --shadow-sheet: var(--shadow-sheet);
-  --shadow-raised: var(--shadow-raised);
+  --shadow-sheet: var(--elevation-sheet);
+  --shadow-raised: var(--elevation-raised);
+  --shadow-card: var(--elevation-card);
 
   --font-sans:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif,
@@ -366,6 +396,22 @@
   &:last-child {
     border-bottom-color: transparent;
   }
+}
+
+/*
+ * A group of rows.
+ *
+ * The single most common surface in the redesign: content that belongs together
+ * gets one soft edge — a 20px radius, a warm hairline, and a shadow you only
+ * notice if you look for it. Rows inside are separated by `divide-y`.
+ * `overflow-hidden` keeps the first and last row inside the radius.
+ */
+@utility card {
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--hairline);
+  background-color: var(--surface);
+  box-shadow: var(--elevation-card);
 }
 
 /* Tap feedback that does not rely on hover, which phones do not have. */

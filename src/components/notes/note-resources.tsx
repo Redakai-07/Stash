@@ -89,7 +89,7 @@ export function NoteResources({
           <button
             type="button"
             onClick={onAttach}
-            className="tap text-row flex w-full items-center gap-2 rounded-control border border-dashed border-border-strong px-3 py-2.5 text-left font-medium text-accent active:bg-surface-2"
+            className="tap text-row flex w-full items-center gap-2 rounded-xl bg-surface-2 px-3.5 py-3 text-left font-medium text-accent active:bg-surface-3"
           >
             <Plus size={17} strokeWidth={2.1} aria-hidden />
             Attach a saved link

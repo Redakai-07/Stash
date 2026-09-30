@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { LogoTile } from '@/components/ui/logo';
 import { getActiveShareBridge } from '@/lib/share/bridge';
 import { useCaptureStore } from '@/stores/capture-store';
 import { usePrivacyStore } from '@/stores/privacy-store';
@@ -53,9 +54,10 @@ export function AppBoot({ children }: { children: React.ReactNode }) {
  * Two jobs, and both are about the session, not about the UI:
  *
  *  1. when the session locks or unlocks, the vault is re-read — which is what
- *     removes locked items from every screen, because they are filtered out of
- *     the store rather than hidden by a component;
- *  2. when the app leaves the foreground, the re-lock policy is applied.
+ *     turns locked items back into readable content, and back again, because the
+ *     store decides what is readable rather than a component hiding it;
+ *  2. when the app leaves the foreground, the session ends — losing the key, not
+ *     merely a flag (see `handleBackground`).
  *
  * Android may also kill the process while backgrounded, so the app state
  * listener and the web `visibilitychange` event are both wired: the native event
@@ -121,11 +123,19 @@ const MAX_SHARE_AGE_MS = 4 * 60 * 1000;
 
 export function ShareListener() {
   const status = useVaultStore((state) => state.status);
-  const started = React.useRef(false);
 
+  /*
+   * Keyed on the vault being ready, with no "already ran" ref.
+   *
+   * A `started` flag looks tidier and is wrong: React in development mounts,
+   * unmounts and remounts this effect on purpose, and the flag survives the
+   * remount while the work it was guarding has already been cancelled — so the
+   * one path that has to work exactly once, on a cold start, silently did
+   * nothing. Running again is safe: the pending share is consumed after it is
+   * read, and opening the same share twice is the same state.
+   */
   React.useEffect(() => {
-    if (status !== 'ready' || started.current) return;
-    started.current = true;
+    if (status !== 'ready') return;
 
     let unsubscribe: () => void = () => undefined;
     let cancelled = false;
@@ -159,26 +169,24 @@ export function ShareListener() {
   return null;
 }
 
-/** Shown while IndexedDB opens. Kept to a mark and a pulse: never a spinner wall. */
+/**
+ * Shown while IndexedDB opens.
+ *
+ * The one screen where the brand is the whole content: the mark on its tile and
+ * the wordmark, at the size a real launch screen would use. It is also the only
+ * place the app names itself — which is what makes it feel like the app opening
+ * rather than a page loading.
+ */
 export function BootSplash() {
   return (
-    <div className="flex h-dvh flex-col items-center justify-center gap-4 bg-bg">
-      {/* The mark alone, with no tinted tile behind it: on a screen that shows
-          nothing else, a coloured rounded square would be the loudest object in
-          the app and would say nothing. */}
+    <div className="bg-bg flex h-dvh flex-col items-center justify-center gap-5">
       <div className="animate-pop-in">
-        <svg viewBox="0 0 24 24" className="size-9 text-accent" aria-hidden>
-          <path
-            d="M6 3h7l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinejoin="round"
-          />
-          <path d="M13 3v5h5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-        </svg>
+        <LogoTile size={72} className="shadow-raised" />
       </div>
-      <p className="text-body text-subtle">Opening your vault…</p>
+      <div className="animate-pop-in text-center">
+        <p className="text-display font-semibold tracking-tight text-fg">Stash</p>
+        <p className="text-body mt-1 text-muted">Opening your vault…</p>
+      </div>
     </div>
   );
 }
@@ -186,10 +194,10 @@ export function BootSplash() {
 export function BootGate({ children }: { children: React.ReactNode }) {
   const status = useVaultStore((state) => state.status);
   const error = useVaultStore((state) => state.error);
-  // The vault is readable before the privacy session is resolved, but rendering
-  // then would flash the shell for a frame before the lock gate covers it. On a
-  // cold start with a passcode set, the very first painted frame should already
-  // be the lock screen.
+  // The vault is readable before the privacy session is resolved, and on a cold
+  // start that read is what decides which rows are ciphertext. Waiting for it
+  // means the first painted frame already shows locked items as locked rather
+  // than flashing their shape and then correcting itself.
   const privacyReady = usePrivacyStore((state) => state.ready);
 
   if (status === 'error') {

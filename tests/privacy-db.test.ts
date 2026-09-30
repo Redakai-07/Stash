@@ -122,6 +122,7 @@ async function enableLegacyPasscodeVault(passcode = PASSCODE): Promise<void> {
     passcodeSet: true,
     deviceUnlockReady: false,
     unlocked: true,
+    unlockedAt: Date.now(),
     message: null,
   });
 }
@@ -441,25 +442,25 @@ describe('session', () => {
     expect((await db.notes.get(id))?.content).toBe(sealed);
   });
 
-  it('locks when the app is backgrounded and re-opens on resume', async () => {
-    // A passcode vault — the shape an older build leaves behind — still locks and
-    // re-opens the way it always did.
+  it('ends the session the moment the app stops being on screen, whatever an old settings row says', async () => {
     await enableLegacyPasscodeVault();
     expect(usePrivacyStore.getState().unlocked).toBe(true);
 
-    // A quick switch stays open under the five-minute policy.
-    await usePrivacyStore.getState().update({ relockPolicy: '5m' });
+    // A vault configured by an earlier build, back when this was a choice. The
+    // row is still read; it no longer decides anything.
+    await usePrivacyStore.getState().update({ relockPolicy: '15m' });
+
+    // Locking the phone is the case the whole feature exists for, so a quick app
+    // switch does not keep the key: it is dropped here, not on the way back in.
     const backgrounded = 1_700_000_000_000;
     usePrivacyStore.getState().handleBackground(backgrounded);
-    expect(usePrivacyStore.getState().unlocked).toBe(true);
-    expect(usePrivacyStore.getState().handleForeground(backgrounded + 30_000)).toBe(false);
-    expect(usePrivacyStore.getState().unlocked).toBe(true);
-
-    // Past the window, coming back locks it.
-    usePrivacyStore.getState().handleBackground(backgrounded);
-    expect(usePrivacyStore.getState().handleForeground(backgrounded + 5 * 60_000)).toBe(true);
     expect(usePrivacyStore.getState().unlocked).toBe(false);
     expect(isSessionLocked()).toBe(true);
+
+    // Coming back does not reopen it, however long the window used to be.
+    expect(usePrivacyStore.getState().handleForeground(backgrounded + 30_000)).toBe(false);
+    expect(usePrivacyStore.getState().handleForeground(backgrounded + 15 * 60_000)).toBe(false);
+    expect(usePrivacyStore.getState().unlocked).toBe(false);
   });
 
   it('locks the moment it is backgrounded under the default policy', async () => {
@@ -470,6 +471,30 @@ describe('session', () => {
     expect(usePrivacyStore.getState().unlocked).toBe(false);
     // Locking drops the key rather than flagging it: nothing can decrypt now.
     expect(isSessionLocked()).toBe(true);
+  });
+
+  it('ends the session on the next tab change, but not on the navigation a reveal caused', async () => {
+    await enableLegacyPasscodeVault();
+    const opened = 1_700_000_000_000;
+    usePrivacyStore.setState({ unlockedAt: opened });
+
+    // Opening a locked folder from Home unlocks and then navigates to Library.
+    // That is one act, so the navigation right after the unlock must not undo it.
+    usePrivacyStore.getState().lockOnTabChange(opened + 500);
+    expect(usePrivacyStore.getState().unlocked).toBe(true);
+
+    // Moving to another tab later is leaving, and the key goes with it.
+    usePrivacyStore.getState().lockOnTabChange(opened + 5_000);
+    expect(usePrivacyStore.getState().unlocked).toBe(false);
+    expect(isSessionLocked()).toBe(true);
+  });
+
+  it('does nothing on a tab change when the session is already locked or unprotected', () => {
+    // Nothing unlocked: there is no session to end, and locking twice must never
+    // be able to fail.
+    usePrivacyStore.setState({ keyringPresent: false, unlocked: true, unlockedAt: null });
+    usePrivacyStore.getState().lockOnTabChange(1_700_000_000_000);
+    expect(usePrivacyStore.getState().unlocked).toBe(true);
   });
 
   it('opens again with the passcode after the session has locked', async () => {

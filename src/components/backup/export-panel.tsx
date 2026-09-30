@@ -72,7 +72,7 @@ export function ExportPanel() {
 
   return (
     <div className="mx-4 flex flex-col gap-3">
-      <div className="overflow-hidden rounded-control border border-hairline bg-surface" role="radiogroup" aria-label="Backup type">
+      <div className="card" role="radiogroup" aria-label="Backup type">
         {BACKUP_MODES.map((option, index) => {
           const active = option.id === mode;
           return (

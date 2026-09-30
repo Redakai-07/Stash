@@ -6,7 +6,10 @@ import {
   relockDelayMs,
   relockPolicyLabel,
   shouldLockOnBackground,
+  shouldLockOnTabChange,
+  shouldPromptForReveal,
   shouldRelock,
+  UNLOCK_NAVIGATION_GRACE_MS,
 } from '@/lib/privacy/session';
 
 /**
@@ -79,10 +82,58 @@ describe('expiry', () => {
   });
 });
 
+describe('the unlock prompt', () => {
+  const locked = { ready: true, keyringPresent: true, unlocked: false };
+
+  it('is shown only for an item the user tapped', () => {
+    expect(shouldPromptForReveal({ ...locked, hasRevealRequest: true })).toBe(true);
+    // A cold start, a tab change, a restart: locked items are unreadable inside
+    // the app, and the app is still the app. No password to open it.
+    expect(shouldPromptForReveal({ ...locked, hasRevealRequest: false })).toBe(false);
+  });
+
+  it('is never shown when there is nothing locked, or nothing to open', () => {
+    expect(
+      shouldPromptForReveal({ ready: true, keyringPresent: false, unlocked: true, hasRevealRequest: false }),
+    ).toBe(false);
+    // Already unlocked, so whatever was tapped is readable: the prompt would be
+    // asking a question that has been answered.
+    expect(
+      shouldPromptForReveal({ ready: true, keyringPresent: true, unlocked: true, hasRevealRequest: true }),
+    ).toBe(false);
+    // Before the session is resolved there is no answer to give yet.
+    expect(shouldPromptForReveal({ ready: false, keyringPresent: true, unlocked: false, hasRevealRequest: true })).toBe(
+      false,
+    );
+  });
+});
+
+describe('a session is the tab', () => {
+  it('never locks when nothing is unlocked', () => {
+    expect(shouldLockOnTabChange(null, T)).toBe(false);
+  });
+
+  it('lets the navigation an unlock caused through', () => {
+    // Opening a locked folder from Home unlocks, then moves to Library.
+    expect(shouldLockOnTabChange(T, T)).toBe(false);
+    expect(shouldLockOnTabChange(T, T + UNLOCK_NAVIGATION_GRACE_MS - 1)).toBe(false);
+  });
+
+  it('ends the session on the next tab change after that', () => {
+    expect(shouldLockOnTabChange(T, T + UNLOCK_NAVIGATION_GRACE_MS)).toBe(true);
+    expect(shouldLockOnTabChange(T, T + 60_000)).toBe(true);
+  });
+
+  it('treats an unreliable clock as expired', () => {
+    expect(shouldLockOnTabChange(T, T - 1)).toBe(true);
+  });
+});
+
 describe('defaults', () => {
   it('is secure by default', () => {
-    // Immediate re-lock, the app covered while locked. Screen privacy stays
-    // opt-in because it blocks screenshots the user may want.
+    // Screen privacy stays opt-in because it blocks screenshots the user may
+    // want. The two legacy fields are still written and still read, but nothing
+    // decides anything from them any more.
     expect(DEFAULT_PRIVACY_SETTINGS.relockPolicy).toBe('immediate');
     expect(DEFAULT_PRIVACY_SETTINGS.lockApp).toBe(true);
     expect(DEFAULT_PRIVACY_SETTINGS.enabled).toBe(false);

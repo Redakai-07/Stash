@@ -1,18 +1,22 @@
 import type { RelockPolicy } from '@/db/types';
 
 /**
- * Session re-lock policy.
+ * How long an unlocked session lasts.
  *
- * Unlocking once should not unlock the vault forever. The policy answers one
- * question: after Stash has been off screen for a while, is the key still
- * allowed to be in memory?
+ * Unlocking is a **session**, not a setting. It ends when the user moves to
+ * another tab, and it ends the moment Stash stops being the visible app — which
+ * is what "lock the phone" looks like from inside the app. There is nothing to
+ * configure, because the only honest choice is the short one: a key that is still
+ * in memory an hour later is a key that was never really protected.
  *
- * The logic is a pure function of the policy plus two timestamps, so the whole
- * timing model is testable without a device, and the React layer only has to feed
- * it `visibilitychange` / `appStateChange` events.
+ * Both rules are pure functions of two timestamps, so the whole timing model is
+ * testable without a device while the React layer only has to report what
+ * happened — a navigation, `visibilitychange`, `appStateChange`.
  *
- * `immediate` is the default because it is the only setting whose guarantee does
- * not depend on the user's estimate of how long "a minute" is.
+ * The `RelockPolicy` list and its helpers below are read but no longer offered:
+ * they exist so a vault written by an earlier build (and the `relockPolicy` field
+ * its backups carry) still validates, and so `shouldRelock` keeps its documented
+ * meaning for those files. Nothing in the app sets a policy any more.
  */
 export interface RelockPolicyOption {
   id: RelockPolicy;
@@ -59,6 +63,56 @@ export function relockDelayMs(policy: RelockPolicy): number {
 
 export function relockPolicyLabel(policy: RelockPolicy): string {
   return RELOCK_POLICIES.find((option) => option.id === policy)?.label ?? 'Immediately';
+}
+
+/**
+ * Whether the unlock prompt is on screen.
+ *
+ * There is exactly one reason it ever is: the user tapped something locked and the
+ * system prompt has not answered for it. Stash has no password of its own and no
+ * lock screen, so a cold start, a tab change, the app coming back to the
+ * foreground and a share arriving all leave this `false` — the app is simply
+ * opened, and locked items are unreadable inside it.
+ *
+ * Separate from the component that draws it so the rule can be pinned by a test
+ * rather than by reading a conditional: "the app never asks for a password to
+ * open" is the requirement, and this is the whole of it.
+ */
+export function shouldPromptForReveal(state: {
+  ready: boolean;
+  keyringPresent: boolean;
+  unlocked: boolean;
+  hasRevealRequest: boolean;
+}): boolean {
+  return state.ready && state.keyringPresent && !state.unlocked && state.hasRevealRequest;
+}
+
+/**
+ * How long after an unlock a tab change is read as part of the same act.
+ *
+ * Opening a locked folder from Home is *one* intention that happens to move the
+ * user between tabs: the unlock answers, then the folder opens. Without this
+ * beat, the navigation that followed the unlock would immediately re-lock the
+ * thing that was just opened, which is the same as never having unlocked it.
+ *
+ * It is deliberately short. It is not a grace period for the session — the key is
+ * dropped on the next tab change either way — only a rule that the navigation
+ * caused by a reveal does not count as leaving.
+ */
+export const UNLOCK_NAVIGATION_GRACE_MS = 2_000;
+
+/**
+ * Whether moving to another tab ends the session.
+ *
+ * `unlockedAt === null` means nothing is unlocked, so there is nothing to end.
+ * A clock that appears to move backwards is treated as expired rather than as
+ * safe, for the same reason `shouldRelock` does: elapsed time cannot be reasoned
+ * about, and locking costs one unlock while not locking costs the feature.
+ */
+export function shouldLockOnTabChange(unlockedAt: number | null, now: number): boolean {
+  if (unlockedAt === null) return false;
+  if (now < unlockedAt) return true;
+  return now - unlockedAt >= UNLOCK_NAVIGATION_GRACE_MS;
 }
 
 /**

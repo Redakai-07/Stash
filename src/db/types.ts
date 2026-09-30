@@ -238,21 +238,30 @@ export const SECURITY_KEYS = {
 } as const;
 
 /**
- * How long the app may sit backgrounded before the unlocked session ends.
+ * How long an unlocked session used to be allowed to last.
  *
- * `immediate` is the secure default: the key is dropped the moment Stash stops
- * being the visible app.
+ * **Legacy only.** The session is no longer configurable: it ends on the next tab
+ * change and the moment the app stops being the visible one, because a key that is
+ * still in memory later than that was never really protected. The type and the
+ * `relockPolicy` field survive so a vault — and a backup file — written by an
+ * earlier build still loads and validates.
  */
 export type RelockPolicy = 'immediate' | '1m' | '5m' | '15m';
 
 export interface PrivacySettings {
   /** True once a keyring exists, i.e. locking content is possible at all. */
   enabled: boolean;
-  /** Re-lock policy applied when the app leaves the foreground. */
+  /**
+   * Legacy only: read from old rows and backups, never acted on. See
+   * {@link RelockPolicy}.
+   */
   relockPolicy: RelockPolicy;
   /**
-   * Whether a locked session covers the whole app or only locked items. On by
-   * default: it is the behaviour people expect from an app that locks.
+   * Legacy only. This used to mean "show a lock screen over the whole app while
+   * locked", which is no longer a thing Stash does: there is no app password and
+   * no gate over the app. Locked items hide themselves and tapping one raises the
+   * system prompt. Kept so an old settings row (and a backup carrying it) still
+   * round-trips.
    */
   lockApp: boolean;
   /** Block screenshots and the recents thumbnail while unlocked. */
@@ -262,9 +271,11 @@ export interface PrivacySettings {
 }
 
 /**
- * Secure by default: re-lock immediately, gate the whole app, and offer
- * biometrics when the device supports them. Screen privacy is opt-in because it
- * blocks screenshots, which is a real cost most users have not asked for.
+ * Locked content by default, and the device prompt as the way to read it.
+ *
+ * Nothing here decides whether the app is usable: it always is. Screen privacy is
+ * the only opt-in, because it blocks screenshots, which is a real cost most users
+ * have not asked for.
  */
 export const DEFAULT_PRIVACY_SETTINGS: PrivacySettings = {
   enabled: false,

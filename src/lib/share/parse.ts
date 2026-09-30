@@ -14,6 +14,26 @@ export interface RawShareInput {
 }
 
 /**
+ * Either shape a share can arrive in.
+ *
+ * There are exactly two, and the difference is *when* it was normalized: the
+ * bridges hand over an {@link IncomingShare} (already parsed, because they are
+ * the only place that knows what an Android Intent extra or a share-target query
+ * string is), while a raw payload is what a test or a stray caller has.
+ *
+ * Both are accepted rather than one being converted to the other, because both
+ * accepted shapes are the ones that actually occur — and because the bug this
+ * type exists to prevent was exactly a re-parse of already-parsed data, which
+ * silently found no text in an object whose text is called `rawText` and turned
+ * every shared link into "nothing to save".
+ */
+export type ShareInput = RawShareInput | IncomingShare;
+
+function isParsedShare(input: ShareInput): input is IncomingShare {
+  return typeof (input as IncomingShare).rawText === 'string';
+}
+
+/**
  * Platform boilerplate that ships alongside a shared link and is never part of
  * a real title. Kept as data so it stays reviewable.
  */
@@ -38,7 +58,12 @@ const PROSE_MAX_WORDS = 16;
  * Never throws and never drops information: `rawText` always preserves the
  * original payload so a future migration can re-parse it.
  */
-export function parseShare(input: RawShareInput): IncomingShare {
+export function parseShare(input: ShareInput): IncomingShare {
+  // A share that is already normalized is handed straight back: parsing is
+  // idempotent by construction, and reading `text` off it (a field it does not
+  // have) would produce an empty share instead of the same one.
+  if (isParsedShare(input)) return input;
+
   const text = typeof input.text === 'string' ? input.text : '';
   const subject = typeof input.subject === 'string' ? input.subject.trim() : '';
   const { urls } = extractUrls(text);
@@ -78,8 +103,10 @@ export interface ParsedShare {
 
 const MAX_TITLE_LENGTH = 180;
 
-export function parseShareToDraft(input: RawShareInput): ParsedShare {
-  const share = parseShare(input);
+export function parseShareToDraft(input: ShareInput): ParsedShare {
+  // Already normalized by a bridge: use it as it is. Re-parsing it here would
+  // read fields it does not have and lose the text it does.
+  const share = isParsedShare(input) ? input : parseShare(input);
   const first = share.urls[0];
   if (!first) return { share, draft: null };
 

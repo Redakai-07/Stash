@@ -149,7 +149,7 @@ export default function TrashPage() {
           </Section>
 
           <Section title="Delete for good" className="pb-10">
-            <div className="mx-4 rounded-control border border-danger/30 bg-danger-soft p-4">
+            <div className="mx-4 rounded-2xl border border-danger/30 bg-danger-soft p-4">
               <p className="text-row font-semibold text-danger">Empty the trash</p>
               <p className="mt-1.5 text-meta leading-relaxed text-fg/80">
                 Permanently removes {pluralize(total, 'item')} from this device. There is no undo after this — the

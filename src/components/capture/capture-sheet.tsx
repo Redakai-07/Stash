@@ -275,7 +275,7 @@ export function CaptureSheet() {
                       <button
                         type="button"
                         onClick={() => setShowCreateFolder(true)}
-                        className="tap mt-0.5 flex w-full items-center gap-3 rounded-xl border border-dashed border-border-strong px-3 py-2.5 text-left active:bg-surface-2"
+                        className="tap mt-0.5 flex w-full items-center gap-3 rounded-xl bg-surface-2 px-3.5 py-3 text-left active:bg-surface-3"
                       >
                         <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-accent">
                           <Plus size={17} strokeWidth={2.1} aria-hidden />

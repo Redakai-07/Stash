@@ -4,8 +4,6 @@ import * as React from 'react';
 import { AlertTriangle, Fingerprint, Lock, LockKeyhole, Smartphone, Unlock } from 'lucide-react';
 import { pluralize } from '@/lib/format';
 import { devicePromptName } from '@/lib/privacy/auth';
-import { RELOCK_POLICIES } from '@/lib/privacy/session';
-import type { RelockPolicy } from '@/db/types';
 import { usePrivacyStore } from '@/stores/privacy-store';
 import { useVaultStore } from '@/stores/vault-store';
 import { Button } from '@/components/ui/button';
@@ -20,9 +18,14 @@ import { PasscodeInput } from './passcode-input';
  *
  * Written to be read by someone deciding whether to trust the app with something
  * private, so the limitations are stated next to the switches rather than buried
- * in a policy page. In particular: what is encrypted, what stays visible, and the
- * fact that the device prompt is the only way in — there is no passcode of
- * Stash's own, and therefore nothing to forget, reset or recover.
+ * in a policy page. In particular: what is encrypted, what stays visible, when an
+ * unlock expires, and the fact that the device prompt is the only way in — there
+ * is no passcode of Stash's own, and therefore nothing to forget, reset or
+ * recover.
+ *
+ * Locking is *not* a lock screen for the app, and the screen says so plainly:
+ * Stash opens like any other app, locked items simply cannot be read, and tapping
+ * one is what raises the system prompt.
  *
  * The passcode flows that used to live here are gone deliberately. A second
  * secret was a second thing to lose, and it weakened the story rather than
@@ -102,16 +105,12 @@ export function PrivacySettings() {
     toast('Locking is off. Everything is readable again.', { tone: 'success' });
   };
 
-  const setPolicy = (policy: RelockPolicy) => {
-    void update({ relockPolicy: policy });
-  };
-
   if (!ready) return null;
 
   return (
     <>
       <Section title="Locking">
-        <div className="mx-4 overflow-hidden rounded-control border border-hairline bg-surface">
+        <div className="mx-4 overflow-hidden card">
           <div className="flex items-center justify-between gap-3 px-4 py-3.5">
             <div className="min-w-0">
               <p className="flex items-center gap-2 text-row font-medium text-fg">
@@ -129,6 +128,12 @@ export function PrivacySettings() {
                     : 'No items are locked yet. Lock a folder, note or link to use this.'
                   : 'Lock folders, notes and links so they are encrypted at rest. They open with your device lock and nothing else.'}
               </p>
+              {keyringPresent ? (
+                <p className="mt-1.5 text-meta leading-relaxed text-subtle">
+                  Locked items hide their contents — a name, a title, an address — and stay that way until you tap one
+                  and pass the prompt. An unlock lasts for the session: it ends when you switch tabs or leave Stash.
+                </p>
+              ) : null}
             </div>
             {keyringPresent && unlocked ? (
               <Button variant="surface" size="sm" onClick={() => lock()}>
@@ -239,54 +244,8 @@ export function PrivacySettings() {
 
       {keyringPresent ? (
         <>
-          <Section title="Re-lock">
-            <div className="mx-4 overflow-hidden rounded-control border border-hairline bg-surface">
-              {RELOCK_POLICIES.map((option, index) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => setPolicy(option.id)}
-                  aria-pressed={settings.relockPolicy === option.id}
-                  className={cn(
-                    'tap flex w-full items-center justify-between gap-3 px-4 py-3 text-left',
-                    index > 0 && 'border-t border-border',
-                    settings.relockPolicy === option.id ? 'bg-accent-soft' : 'active:bg-surface-2',
-                  )}
-                >
-                  <span className="min-w-0">
-                    <span
-                      className={cn(
-                        'block text-row font-medium',
-                        settings.relockPolicy === option.id ? 'text-accent' : 'text-fg',
-                      )}
-                    >
-                      {option.label}
-                    </span>
-                    <span className="mt-0.5 block text-meta text-subtle">{option.description}</span>
-                  </span>
-                  {settings.relockPolicy === option.id ? (
-                    <span className="shrink-0 text-label font-semibold text-accent">
-                      Active
-                    </span>
-                  ) : null}
-                </button>
-              ))}
-            </div>
-            <p className="px-5 pt-2 text-meta leading-relaxed text-subtle">
-              Locking drops the vault key from memory. Locked items stay encrypted on disk either way — this only
-              controls how soon you must unlock again.
-            </p>
-          </Section>
-
           <Section title="Protection">
-            <div className="mx-4 overflow-hidden rounded-control border border-hairline bg-surface">
-              <ToggleRow
-                icon={<Lock size={17} strokeWidth={1.9} aria-hidden />}
-                label="Cover the app when locked"
-                description="Show the lock screen over everything until you unlock."
-                checked={settings.lockApp !== false}
-                onChange={(value) => void update({ lockApp: value })}
-              />
+            <div className="mx-4 overflow-hidden card">
               <ToggleRow
                 icon={<Smartphone size={17} strokeWidth={1.9} aria-hidden />}
                 label="Block screenshots and app previews"
@@ -299,7 +258,7 @@ export function PrivacySettings() {
           </Section>
 
           <Section title="Device unlock">
-            <div className="mx-4 overflow-hidden rounded-control border border-hairline bg-surface">
+            <div className="mx-4 overflow-hidden card">
               <ToggleRow
                 icon={<Fingerprint size={17} strokeWidth={1.9} aria-hidden />}
                 label={deviceStoreKind === 'web' ? 'Use Windows Hello' : 'Use fingerprint or face'}
@@ -336,13 +295,14 @@ export function PrivacySettings() {
             {keyringPresent ? (
               <p className="px-5 pt-2 text-meta leading-relaxed text-warning">
                 There is no passcode and no reset. If this device can no longer prompt — or the app&apos;s data is
-                cleared — every locked item stays unreadable, on this device and in any backup of it.
+                cleared — every locked item stays unreadable, on this device and in any backup of it. Everything else
+                in the vault keeps working normally.
               </p>
             ) : null}
           </Section>
 
           <Section title="What is protected">
-            <div className="mx-4 rounded-control border border-hairline bg-surface p-4">
+            <div className="mx-4 card p-4">
               <ul className="flex flex-col gap-2 text-meta leading-relaxed text-muted">
                 <li>
                   <span className="font-medium text-fg">Encrypted:</span> a locked item&apos;s note title and body,
@@ -364,16 +324,16 @@ export function PrivacySettings() {
                   code.
                 </li>
                 <li>
-                  <span className="font-medium text-fg">After a restart:</span> the vault opens locked, and the key
-                  comes back only from that prompt. Nothing else opens a locked item — not a passcode, not a recovery
-                  code, not us.
+                  <span className="font-medium text-fg">After a restart:</span> nothing is unlocked. The key comes back
+                  only from that prompt, and it does not outlive the session — switching tabs or leaving Stash locks
+                  the items again. Nothing else opens one: not a passcode, not a recovery code, not us.
                 </li>
               </ul>
             </div>
           </Section>
 
           <Section title="If the device prompt stops working" className="pb-10">
-            <div className="mx-4 rounded-control border border-danger/30 bg-danger-soft p-4">
+            <div className="mx-4 rounded-2xl border border-danger/30 bg-danger-soft p-4">
               <p className="flex items-center gap-2 text-row font-semibold text-danger">
                 <AlertTriangle size={17} strokeWidth={2} aria-hidden />
                 There is no recovery

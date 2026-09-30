@@ -1,23 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Stash">
-  <defs>
-    <linearGradient id="bgm" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#6D5FF0" />
-      <stop offset="1" stop-color="#4B3FD4" />
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" fill="url(#bgm)" />
-  <g transform="translate(256 256) scale(0.72)">
+  <!--
+    The maskable icon: the same mark, on a background that bleeds to every edge.
+
+    Android and the PWA mask this one themselves, so there is no rounded tile here
+    and the mark is pulled in to 1.0 of its tile scale: everything important sits
+    inside the middle 80% circle, which is the region a circular, squircle or
+    teardrop mask is guaranteed to keep.
+  -->
+  <rect width="512" height="512" fill="#182A24" />
+  <g transform="translate(256 254) scale(1.0) translate(-256 -254)">
     <path
-      d="M-84 -104 h104 l64 64 v144 a16 16 0 0 1 -16 16 h-152 a16 16 0 0 1 -16 -16 v-192 a16 16 0 0 1 16 -16 Z"
-      fill="none"
-      stroke="#ffffff"
-      stroke-width="24"
-      stroke-linejoin="round"
-      stroke-linecap="round"
+      d="M 204 140 H 308 Q 348 140 348 180 V 352 Q 348 368 336 368 L 268 322 Q 256 317 244 322 L 176 368 Q 164 368 164 352 V 180 Q 164 140 204 140 Z"
+      fill="#F6F1E7"
     />
-    <path d="M20 -104 v56 a8 8 0 0 0 8 8 h56" fill="none" stroke="#ffffff" stroke-width="24" stroke-linejoin="round" stroke-linecap="round" />
-    <path d="M-50 -28 h100" stroke="#ffffff" stroke-width="24" stroke-linecap="round" opacity="0.85" />
-    <path d="M-50 16 h100" stroke="#ffffff" stroke-width="24" stroke-linecap="round" opacity="0.6" />
-    <path d="M-50 60 h56" stroke="#ffffff" stroke-width="24" stroke-linecap="round" opacity="0.4" />
   </g>
 </svg>

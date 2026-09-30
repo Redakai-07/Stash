@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
+  <!--
+    The Android adaptive-icon foreground.
+
+    Android draws the background full-bleed and masks the result, so this file is
+    only the mark: no tile, no background, transparent everywhere else. The mark
+    is scaled to fill the 66-unit safe zone, which is the region every launcher
+    mask (circle, squircle, teardrop) is guaranteed to keep.
+  -->
+  <g transform="translate(54 53.6) scale(0.27637) translate(-256 -254)">
+    <path
+      d="M 204 140 H 308 Q 348 140 348 180 V 352 Q 348 368 336 368 L 268 322 Q 256 317 244 322 L 176 368 Q 164 368 164 352 V 180 Q 164 140 204 140 Z"
+      fill="#F6F1E7"
+    />
+  </g>
+</svg>

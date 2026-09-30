@@ -2,20 +2,20 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
  * Page scaffolding.
  *
- * One sticky header pattern for every screen keeps the scroll position obvious
- * and avoids the "huge hero heading" habit: the title is small, the content is
- * the point.
+ * One sticky header pattern for every screen keeps the scroll position obvious,
+ * and the title is a real title: 28px, tight, one per screen. A big heading on a
+ * phone is not decoration — it is what tells the eye where the screen begins and
+ * what it is, in the half-second before any content is read.
  *
- * The whole file is deliberately thin on containers. A list is a list — rows
- * separated by a hairline — not a stack of floating cards, and a section is a
- * label plus space, not a box. Structure comes from rhythm and rules; a box is
- * reserved for something that is genuinely raised off the page.
+ * There is no rule under the header. A hairline across the full width is the
+ * single most "tool-like" detail an app can have: it reads as a table boundary
+ * rather than as a title. The blur behind the title is what separates it from
+ * content scrolling underneath.
  */
 
 export function PageHeader({
@@ -29,11 +29,7 @@ export function PageHeader({
 }) {
   return (
     <header
-      className={cn(
-        'z-20 border-b border-hairline bg-bg/80 px-4 pt-3 pb-3 backdrop-blur-xl',
-        sticky && 'sticky top-0',
-        className,
-      )}
+      className={cn('z-20 bg-bg/85 px-4 pt-4 pb-3 backdrop-blur-xl', sticky && 'sticky top-0', className)}
     >
       {children}
     </header>
@@ -44,7 +40,7 @@ export function PageTitle({ children, subtitle }: { children: React.ReactNode; s
   return (
     <div className="min-w-0">
       <h1 className="text-display truncate font-semibold text-fg">{children}</h1>
-      {subtitle ? <p className="text-meta mt-0.5 truncate text-muted">{subtitle}</p> : null}
+      {subtitle ? <p className="text-body mt-1 truncate text-muted">{subtitle}</p> : null}
     </div>
   );
 }
@@ -65,27 +61,28 @@ export function Section({
   className?: string;
 }) {
   return (
-    <section className={cn('mt-7 first:mt-3', className)}>
-      <div className="flex items-baseline justify-between gap-3 px-4 pb-1">
-        {/* Sentence case and no tracking: a section label is a signpost, not a
-            decorative eyebrow. */}
-        <h2 className="text-label truncate text-subtle">{title}</h2>
+    <section className={cn('mt-8 first:mt-4', className)}>
+      <div className="flex items-baseline justify-between gap-3 px-4 pb-2">
+        {/*
+            Sentence case, semibold, and *legible*: a section label is a signpost,
+            not an eyebrow. It used to be 12px grey, which is the size and colour
+            of a caption nobody is meant to read.
+        */}
+        <h2 className="text-label truncate font-semibold text-muted">{title}</h2>
         {action && actionHref ? (
           <Link
             href={actionHref}
-            className="tap text-meta flex shrink-0 items-center gap-0.5 rounded-tap px-1 py-0.5 font-medium text-accent active:bg-accent-soft"
+            className="tap text-meta shrink-0 rounded-tap px-1 py-0.5 font-semibold text-accent active:bg-accent-soft"
           >
             {action}
-            <ChevronRight size={14} strokeWidth={2.2} aria-hidden />
           </Link>
         ) : action && onAction ? (
           <button
             type="button"
             onClick={onAction}
-            className="tap text-meta flex shrink-0 items-center gap-0.5 rounded-tap px-1 py-0.5 font-medium text-accent active:bg-accent-soft"
+            className="tap text-meta shrink-0 rounded-tap px-1 py-0.5 font-semibold text-accent active:bg-accent-soft"
           >
             {action}
-            <ChevronRight size={14} strokeWidth={2.2} aria-hidden />
           </button>
         ) : null}
       </div>
@@ -95,11 +92,12 @@ export function Section({
 }
 
 /**
- * An empty state, stated plainly.
+ * An empty state, said kindly.
  *
- * No illustration, no rounded icon tile above the words. An empty screen is a
- * chance to say one useful sentence, and a decorative box would be the loudest
- * thing on a screen that is empty *because there is nothing to show*.
+ * The icon sits on a soft accent tile and the block is centred, because an empty
+ * screen is the one place where the app has nothing to show and everything to
+ * explain: it should look deliberate rather than half-loaded. The copy is one
+ * short sentence plus a way forward, never a numbered manual.
  */
 export function EmptyState({
   icon,
@@ -115,45 +113,42 @@ export function EmptyState({
   className?: string;
 }) {
   return (
-    <div className={cn('flex flex-col items-start gap-1.5 px-1 py-8', className)}>
-      {icon ? <span className="mb-1 text-subtle">{icon}</span> : null}
-      <p className="text-row font-semibold text-fg">{title}</p>
-      {description ? (
-        <p className="text-meta max-w-[42ch] leading-relaxed text-muted">{description}</p>
+    <div className={cn('flex flex-col items-center gap-3 px-6 py-10 text-center', className)}>
+      {icon ? (
+        <span className="mb-1 flex size-12 items-center justify-center rounded-2xl bg-accent-soft text-accent">
+          {icon}
+        </span>
       ) : null}
-      {action ? <div className="mt-2.5">{action}</div> : null}
+      <p className="text-title font-semibold tracking-tight text-fg">{title}</p>
+      {description ? (
+        <p className="text-body max-w-[34ch] leading-relaxed text-muted text-balance">{description}</p>
+      ) : null}
+      {action ? <div className="mt-2">{action}</div> : null}
     </div>
   );
 }
 
 /**
- * A list.
+ * A group of rows.
  *
- * Hairline-separated rows, full-bleed rules, no per-row background. This is the
- * single most common surface in the app, which is exactly why it must not be a
- * repeated rounded card: thirty of those is a template, and it also wastes
- * vertical space on a phone.
+ * One soft edge around content that belongs together — a warm hairline, a 20px
+ * radius, and rows divided inside it. This is the app's most common surface, and
+ * it replaced full-bleed hairlines for a reason: a screen of bare rules reads as
+ * a spreadsheet, while the same rows on a card read as a handful of things the
+ * user owns. It is always inset by the page margin, so the card's edge is never
+ * confusing with the screen's edge.
  */
 export function ListSurface({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn('flex flex-col divide-y divide-hairline', className)}>{children}</div>;
+  return <div className={cn('card mx-4 flex flex-col divide-y divide-hairline', className)}>{children}</div>;
 }
 
 /**
- * A grouped list with a surrounding edge — used for settings-style blocks,
- * where the group itself is the unit ("Your vault", "Appearance").
+ * The same surface as {@link ListSurface}, kept as a name because settings-style
+ * screens talk about groups ("Appearance", "Locking") rather than lists.
  *
- * This is the one place a container earns its border: it says "these rows are
- * one thing", which a bare list cannot say.
+ * They used to be two different looks — one bordered, one bare — which is how an
+ * app ends up with two visual languages for the same idea. There is one.
  */
 export function GroupSurface({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div
-      className={cn(
-        'flex flex-col divide-y divide-hairline overflow-hidden rounded-control border border-hairline bg-surface',
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
+  return <div className={cn('card mx-4 flex flex-col divide-y divide-hairline', className)}>{children}</div>;
 }

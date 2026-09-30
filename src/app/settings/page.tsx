@@ -3,7 +3,6 @@
 import * as React from 'react';
 import Link from 'next/link';
 import {
-  AlertTriangle,
   Archive,
   ChevronRight,
   Inbox,
@@ -23,6 +22,7 @@ import { useVaultStore } from '@/stores/vault-store';
 import { useBackupStore } from '@/stores/backup-store';
 import { useThemeStore, type ThemeMode } from '@/stores/theme-store';
 import { Button } from '@/components/ui/button';
+import { LogoTile } from '@/components/ui/logo';
 import { PageHeader, PageTitle, Section } from '@/components/ui/page';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/ui/toast';
@@ -80,7 +80,7 @@ export default function SettingsPage() {
       </PageHeader>
 
       <Section title="Appearance">
-        <div className="mx-4 rounded-control border border-hairline bg-surface p-1">
+        <div className="card mx-4 p-1">
           <div className="flex gap-1">
             {THEME_OPTIONS.map((option) => {
               const OptionIcon = option.icon;
@@ -126,7 +126,7 @@ export default function SettingsPage() {
         <div className="mx-4 mt-3 flex flex-col gap-2">
           <Link
             href="/inbox"
-            className="tap flex items-center gap-3 rounded-xl border border-hairline bg-surface px-3.5 py-3 active:bg-surface-2"
+            className="tap flex items-center gap-3 rounded-2xl border border-hairline bg-surface px-4 py-3.5 active:bg-surface-2"
           >
             <Inbox size={18} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden />
             <span className="min-w-0 flex-1">
@@ -139,7 +139,7 @@ export default function SettingsPage() {
           </Link>
           <Link
             href="/search?filter=archived"
-            className="tap flex items-center gap-3 rounded-xl border border-hairline bg-surface px-3.5 py-3 active:bg-surface-2"
+            className="tap flex items-center gap-3 rounded-2xl border border-hairline bg-surface px-4 py-3.5 active:bg-surface-2"
           >
             <Archive size={18} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden />
             <span className="min-w-0 flex-1">
@@ -152,7 +152,7 @@ export default function SettingsPage() {
           </Link>
           <Link
             href="/trash"
-            className="tap flex items-center gap-3 rounded-xl border border-hairline bg-surface px-3.5 py-3 active:bg-surface-2"
+            className="tap flex items-center gap-3 rounded-2xl border border-hairline bg-surface px-4 py-3.5 active:bg-surface-2"
           >
             <RotateCcw size={18} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden />
             <span className="min-w-0 flex-1">
@@ -195,7 +195,7 @@ export default function SettingsPage() {
       </Section>
 
       <Section title="Danger zone" className="pb-10">
-        <div className="mx-4 rounded-control border border-danger/30 bg-danger-soft p-4">
+        <div className="mx-4 rounded-2xl border border-danger/30 bg-danger-soft p-4">
           <p className="text-row font-semibold text-danger">Erase everything</p>
           <p className="mt-1.5 text-meta leading-relaxed text-fg/80">
             Deletes {pluralize(activeLinks.length, 'link')}, {pluralize(notes.length, 'note')} and{' '}
@@ -222,11 +222,13 @@ export default function SettingsPage() {
         </div>
       </Section>
 
-      <div className="px-5 pb-8">
-        <p className="flex items-center gap-1.5 text-meta text-subtle">
-          <AlertTriangle size={13} strokeWidth={2} aria-hidden />
-          Stash v0.1 · offline vault for links and notes
-        </p>
+      {/* The brand sign-off. The mark appears exactly twice in the app — on the
+          launch screen and here — so seeing it again means "this is the bottom of
+          everything", which is a nicer end to a settings page than a version
+          string on its own. */}
+      <div className="flex flex-col items-center gap-2 px-5 pt-2 pb-10">
+        <LogoTile size={40} />
+        <p className="text-meta text-subtle text-center">Stash v0.1 · offline vault for links and notes</p>
       </div>
 
       {/* Mounted once for the whole page: the flow is driven by the store, so it

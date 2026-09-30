@@ -13,11 +13,13 @@ import { LockedRow, useRevealLocked } from '@/components/privacy/locked-row';
 /**
  * A folder in a list.
  *
- * The icon the user chose is shown inline and in one colour, because it is
- * information architecture — it is the little differentiator between "Android"
- * and "Machine Learning" at a glance. It is *not* shown inside a rounded tile
- * with its own background: that would turn every row into a card whose loudest
- * element is decoration.
+ * The icon the user chose is information architecture — it is the little
+ * differentiator between "Android" and "Machine Learning" at a glance — so it
+ * gets a soft tile of its own, and it is the only row in the app that does. A
+ * folder is an object with an identity the user gave it; a link or a note is
+ * content, which is why those rows stay bare. The tile is the quiet surface
+ * step, not the accent: twenty folders on a screen should not be twenty green
+ * squares.
  */
 export interface FolderRowProps {
   folder: Folder;
@@ -71,13 +73,13 @@ export function FolderRow({
           onOpen();
         }}
         {...handlers}
-        className="tap flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left active:bg-surface-2"
+        className="tap flex min-w-0 flex-1 items-center gap-3 px-4 py-3.5 text-left active:bg-surface-2"
       >
-        <span className="shrink-0 text-subtle">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-muted">
           {isIconName(folder.icon) ? (
-            <Icon name={folder.icon} size={19} strokeWidth={1.7} />
+            <Icon name={folder.icon} size={19} strokeWidth={1.8} />
           ) : (
-            <Icon name="folder" size={19} strokeWidth={1.7} />
+            <Icon name="folder" size={19} strokeWidth={1.8} />
           )}
         </span>
         <span className="min-w-0 flex-1">
@@ -101,9 +103,9 @@ export function FolderRow({
         type="button"
         onClick={onShowActions}
         aria-label={`${folder.name} actions`}
-        className="tap mr-1 flex w-10 shrink-0 items-center justify-center rounded-full text-subtle active:bg-surface-2"
+        className="tap mr-1 flex w-10 shrink-0 items-center justify-center rounded-full text-muted active:bg-surface-2"
       >
-        <MoreHorizontal size={18} strokeWidth={2} aria-hidden />
+        <MoreHorizontal size={19} strokeWidth={2} aria-hidden />
       </button>
     </div>
   );

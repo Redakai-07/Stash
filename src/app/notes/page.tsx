@@ -233,7 +233,7 @@ function NotesView() {
           */}
         {sealed ? (
           <div className="px-4 py-6">
-            <div className="flex flex-col items-start gap-3 rounded-control border border-hairline bg-surface px-4 py-5">
+            <div className="card mx-4 flex flex-col items-start gap-3 px-4 py-5">
               <span className="flex items-center gap-2 text-row font-semibold text-fg">
                 <Lock size={17} strokeWidth={2} className="text-accent" aria-hidden />
                 This note is locked
@@ -291,7 +291,7 @@ function NotesView() {
             <button
               type="button"
               onClick={() => void createNote(current.id)}
-              className="tap flex w-full items-center gap-3 rounded-xl border border-dashed border-border-strong px-3 py-2.5 text-left active:bg-surface-2"
+              className="tap flex w-full items-center gap-3 rounded-xl bg-surface-2 px-3.5 py-3 text-left active:bg-surface-3"
             >
               <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-accent">
                 <FilePlus2 size={17} strokeWidth={2.1} aria-hidden />
